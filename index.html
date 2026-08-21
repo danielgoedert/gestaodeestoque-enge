@@ -393,34 +393,95 @@
       <section id="pg-relatorios" class="pg">
         <div class="pg-header">
           <div>
-            <h1>Relatórios</h1>
-            <p class="pg-sub">Gere, visualize e exporte relatórios para uma gestão mais eficiente</p>
+            <h1>Central de Relatórios & Inteligência</h1>
+            <p class="pg-sub">Emita relatórios executivos, analíticos e operacionais com gráficos em tempo real</p>
+          </div>
+          <div class="header-actions">
+            <button type="button" class="btn-outline" onclick="imprimirRelatorioAtual()"><i data-lucide="printer"></i> Imprimir / PDF</button>
+            <button type="button" class="btn-primary" onclick="exportarRelatorioAtual()"><i data-lucide="download"></i> Exportar Planilha (CSV)</button>
           </div>
         </div>
-        <div class="reports-workspace">
-          <div class="reports-main-column">
-            <div class="card report-selector-card">
-              <div class="card-header"><span class="card-title">Escolha o tipo de relatório</span><span class="card-helper">Clique para selecionar</span></div>
-              <div class="relatorio-grid" id="relat-cards"></div>
-            </div>
-            <div class="card report-recent-card">
-              <div class="card-header"><span class="card-title">Relatórios recentes</span></div>
-              <div class="table-wrap">
-                <table class="tbl" id="relat-tbl">
-                  <thead><tr><th>Relatório</th><th>Gerado em</th><th>Formato</th></tr></thead>
-                  <tbody id="relat-tbody"></tbody>
-                </table>
+
+        <!-- SELETOR DE RELATÓRIO (Cards horizontais no topo como na imagem 4 do usuário) -->
+        <div class="card report-selector-card">
+          <div class="card-header">
+            <span class="card-title">Escolha o tipo de relatório</span>
+            <span class="card-helper">Clique em um dos cards para carregar a análise imediatamente</span>
+          </div>
+          <div class="relatorio-grid" id="relat-cards"></div>
+        </div>
+
+        <!-- PAINEL INTERATIVO DO RELATÓRIO SELECIONADO -->
+        <div class="card report-viewer-card" id="report-viewer-card" style="margin-top: 18px;">
+          <!-- BARRA DE FILTROS E CONTROLES DO RELATÓRIO -->
+          <div class="report-toolbar">
+            <div class="report-toolbar-left">
+              <div class="report-title-badge">
+                <span class="report-badge-icon" id="report-badge-icon"><i data-lucide="package"></i></span>
+                <div>
+                  <h3 id="report-current-title">Posição Executiva de Estoque</h3>
+                  <p id="report-current-subtitle">Visão patrimonial completa de saldo, valor e curva ABC de produtos</p>
+                </div>
               </div>
             </div>
+            <div class="report-toolbar-right">
+              <div class="input-icon search-filter" style="width: 220px;">
+                <span><i data-lucide="search"></i></span>
+                <input type="text" id="report-search-input" placeholder="Filtrar nesta tabela..." oninput="filtrarDadosRelatorio()" maxlength="100">
+              </div>
+              <select id="report-period-select" onchange="atualizarPeriodoRelatorio(this.value)" class="select-md" style="min-width: 160px;">
+                <option value="all">Todo o histórico</option>
+                <option value="30">Últimos 30 dias</option>
+                <option value="60">Últimos 60 dias</option>
+                <option value="90">Últimos 90 dias</option>
+              </select>
+              <button type="button" class="btn-outline sm" onclick="copiarResumoRelatorio()" title="Copiar resumo textual para a área de transferência"><i data-lucide="copy"></i> Copiar Resumo</button>
+            </div>
           </div>
-          <aside class="card report-generator-card">
-            <div class="report-generator-heading"><span>Gerar relatório</span><small>Configure antes de baixar</small></div>
-            <div class="selected-report-preview"><span id="selected-report-icon" aria-hidden="true"><i data-lucide="package"></i></span><div><small>Relatório selecionado</small><strong id="selected-report-name">Posição de estoque</strong><p id="selected-report-description">Saldo, nível e valor dos produtos.</p></div></div>
-            <div class="form-group"><label>Período</label><select id="report-period"><option value="all">Todo o histórico</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select></div>
-            <div class="form-group"><label>Formato</label><select id="report-format"><option value="csv">Planilha CSV</option></select></div>
-            <button class="btn-primary w100" onclick="gerarRelatorioSelecionado()"><i data-lucide="file-text"></i> Gerar relatório</button>
-            <p class="report-generator-note">O arquivo será gerado e protegido contra injeção de fórmulas.</p>
-          </aside>
+
+          <!-- KPIs DINÂMICOS DO RELATÓRIO -->
+          <div class="kpi-row" id="report-kpis" style="margin-bottom: 20px;"></div>
+
+          <!-- GRÁFICO DO RELATÓRIO -->
+          <div class="report-chart-container" id="report-chart-container">
+            <div class="report-chart-header">
+              <strong id="report-chart-title">Distribuição Visual</strong>
+              <span class="card-helper" id="report-chart-subtitle">Indicador gráfico consolidado</span>
+            </div>
+            <div class="report-canvas-wrap">
+              <canvas id="chart-relatorio-dinamico" title="Gráfico do relatório"></canvas>
+            </div>
+          </div>
+
+          <!-- TABELA COMPLETA DO RELATÓRIO -->
+          <div class="report-table-section">
+            <div class="table-wrap">
+              <table class="tbl" id="report-main-table">
+                <thead id="report-table-thead"></thead>
+                <tbody id="report-table-tbody"></tbody>
+              </table>
+            </div>
+            <div class="report-table-footer">
+              <span id="report-table-count">Carregando registros...</span>
+              <span style="font-size: 11.5px; color: #16a34a;"><i data-lucide="shield-check" style="width: 14px; height: 14px; vertical-align: middle;"></i> Dados sanitizados e protegidos</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- HISTÓRICO DE RELATÓRIOS RECENTES -->
+        <div class="card report-recent-card" style="margin-top: 18px;">
+          <div class="card-header">
+            <div>
+              <span class="card-title">Relatórios Recentes</span>
+              <p class="card-helper">Histórico de exportações e emissões geradas</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="tbl" id="relat-tbl">
+              <thead><tr><th>Relatório</th><th>Gerado em</th><th>Responsável</th><th>Formato</th><th>Ação</th></tr></thead>
+              <tbody id="relat-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </section>
 

@@ -1152,46 +1152,548 @@ renderEstoque = function () {
 };
 
 const reportTypes = {
-  stock: { icon: 'package', name: 'Posição de estoque', description: 'Saldo, nível e valor dos produtos.' },
-  purchases: { icon: 'shopping-cart', name: 'Necessidade de compra', description: 'Itens abaixo do nível mínimo e reposição sugerida.' },
-  movements: { icon: 'arrow-left-right', name: 'Movimentações', description: 'Entradas, saídas e ajustes registrados.' },
-  suppliers: { icon: 'handshake', name: 'Fornecedores', description: 'Cadastro, avaliação e desempenho de entrega.' }
+  stock: {
+    icon: 'package',
+    name: 'Posição de estoque',
+    subtitle: 'Visão patrimonial completa de saldo, valor e curva ABC de produtos',
+    description: 'Saldo, nível e valor dos produtos.'
+  },
+  purchases: {
+    icon: 'shopping-cart',
+    name: 'Necessidade de compra',
+    subtitle: 'Produtos abaixo do estoque mínimo com reposição sugerida e custos',
+    description: 'Itens abaixo do nível mínimo e reposição sugerida.'
+  },
+  movements: {
+    icon: 'arrow-left-right',
+    name: 'Movimentações',
+    subtitle: 'Fluxo diário de entradas, saídas e ajustes com trilha de responsabilidade',
+    description: 'Entradas, saídas e ajustes registrados.'
+  },
+  suppliers: {
+    icon: 'handshake',
+    name: 'Fornecedores',
+    subtitle: 'Scorecard de pontualidade, qualidade e volume acumulado de compras',
+    description: 'Cadastro, avaliação e desempenho de entrega.'
+  }
 };
+
+let selectedReportType = 'stock';
+let currentReportRows = [];
+let reportChartInstance = null;
+
 renderRelatorios = function () {
-  $('relat-cards').innerHTML = Object.entries(reportTypes).map(([key, report]) => `
-    <button type="button" class="relat-card ${key === selectedReportType ? 'selected' : ''}" onclick="selecionarRelatorio('${key}',this)">
-      <div class="rc-icon" aria-hidden="true"><i data-lucide="${report.icon}"></i></div>
-      <div class="rc-info">
-        <h4>${report.name}</h4>
-        <p>${report.description}</p>
-      </div>
-    </button>
-  `).join('');
-  atualizarPainelRelatorio();
+  const container = $('relat-cards');
+  if (container) {
+    container.innerHTML = Object.entries(reportTypes).map(([key, report]) => `
+      <button type="button" class="relat-card ${key === selectedReportType ? 'selected' : ''}" onclick="selecionarRelatorio('${key}', this)">
+        <div class="rc-icon" aria-hidden="true"><i data-lucide="${report.icon}"></i></div>
+        <div class="rc-info">
+          <h4>${report.name}</h4>
+          <p>${report.description}</p>
+        </div>
+      </button>
+    `).join('');
+  }
+  carregarDadosRelatorio(selectedReportType);
   renderRecentReports();
+  refreshInterfaceIcons();
 };
 
 function selecionarRelatorio(key, element) {
   selectedReportType = key;
   document.querySelectorAll('#relat-cards .relat-card').forEach(card => card.classList.remove('selected'));
   element?.classList.add('selected');
-  atualizarPainelRelatorio();
-}
-
-function atualizarPainelRelatorio() {
-  const report = reportTypes[selectedReportType];
-  if (!report) return;
-  $('selected-report-icon').innerHTML = `<i data-lucide="${report.icon}"></i>`;
-  $('selected-report-name').textContent = report.name;
-  $('selected-report-description').textContent = report.description;
+  carregarDadosRelatorio(key);
   refreshInterfaceIcons();
 }
 
+function carregarDadosRelatorio(type) {
+  const reportInfo = reportTypes[type] || reportTypes.stock;
+  if ($('report-badge-icon')) $('report-badge-icon').innerHTML = `<i data-lucide="${reportInfo.icon}"></i>`;
+  if ($('report-current-title')) $('report-current-title').textContent = reportInfo.name;
+  if ($('report-current-subtitle')) $('report-current-subtitle').textContent = reportInfo.subtitle;
+
+  const allProducts = products();
+  const allMovements = DB.get('movimentacoes') || [];
+  const allSuppliers = DB.get('fornecedores') || [];
+
+  if (type === 'stock') {
+    renderRelatorioEstoque(allProducts);
+  } else if (type === 'purchases') {
+    renderRelatorioCompras(allProducts);
+  } else if (type === 'movements') {
+    renderRelatorioMovimentacoes(allMovements);
+  } else if (type === 'suppliers') {
+    renderRelatorioFornecedores(allSuppliers);
+  }
+
+  refreshInterfaceIcons();
+}
+
+function renderRelatorioEstoque(allProducts) {
+  const totalVal = allProducts.reduce((sum, p) => sum + (Number(p.estoqueAtual) || 0) * (Number(p.custo) || 0), 0);
+  const totalUnits = allProducts.reduce((sum, p) => sum + (Number(p.estoqueAtual) || 0), 0);
+  const normalItems = allProducts.filter(p => epStatus(p) === 'Normal');
+  const alertItems = allProducts.filter(p => epStatus(p) !== 'Normal');
+  const normalPct = allProducts.length ? Math.round((normalItems.length / allProducts.length) * 100) : 100;
+
+  kpi('report-kpis', [
+    { icon: 'package', value: allProducts.length, label: 'Itens cadastrados', delta: `${totalUnits.toLocaleString('pt-BR')} unidades` },
+    { icon: 'wallet-cards', value: money(totalVal), label: 'Valor total imobilizado' },
+    { icon: 'trending-up', value: `${normalPct}%`, label: 'Itens em nível normal', color: 'green' },
+    { icon: 'triangle-alert', value: alertItems.length, label: 'Itens com alerta', color: alertItems.length ? 'red' : 'green' }
+  ]);
+
+  // Gráfico: Valor por Categoria
+  const catMap = {};
+  allProducts.forEach(p => {
+    const cat = p.categoria || 'Outros';
+    catMap[cat] = (catMap[cat] || 0) + (Number(p.estoqueAtual) || 0) * (Number(p.custo) || 0);
+  });
+  const sortedCats = Object.entries(catMap).sort((a, b) => b[1] - a[1]);
+  renderGraficoRelatorio('doughnut', {
+    labels: sortedCats.map(c => c[0]),
+    datasets: [{
+      data: sortedCats.map(c => c[1]),
+      backgroundColor: ['#2563eb', '#f5851f', '#10b981', '#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#94a3b8']
+    }]
+  }, 'Valor em Estoque por Categoria (R$)');
+
+  // Tabela
+  const abcMap = computeAbcClasses(allProducts);
+  $('report-table-thead').innerHTML = `
+    <tr>
+      <th>Código</th><th>Produto</th><th>Categoria</th><th>Unid.</th><th>Saldo Atual</th><th>Est. Mín.</th><th>Est. Máx.</th><th>Custo Unit.</th><th>Valor Total</th><th>Curva ABC</th><th>Status</th>
+    </tr>
+  `;
+
+  currentReportRows = allProducts.map(p => {
+    const val = (Number(p.estoqueAtual) || 0) * (Number(p.custo) || 0);
+    const abc = abcMap[p.id] || 'C';
+    const st = epStatus(p);
+    return {
+      textSearch: `${p.id} ${p.nome} ${p.categoria} ${st}`.toLowerCase(),
+      html: `
+        <tr>
+          <td><strong>${esc(p.id)}</strong></td>
+          <td><strong>${esc(p.nome)}</strong></td>
+          <td><span class="category-pill">${esc(p.categoria)}</span></td>
+          <td>${esc(p.unidade)}</td>
+          <td><strong>${Number(p.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
+          <td>${Number(p.estoqueMin).toLocaleString('pt-BR')}</td>
+          <td>${Number(p.estoqueMax).toLocaleString('pt-BR')}</td>
+          <td>${money(p.custo)}</td>
+          <td><strong>${money(val)}</strong></td>
+          <td><span class="badge ${abc === 'A' ? 'normal' : abc === 'B' ? 'ajuste' : 'sem-estoque'}">Classe ${abc}</span></td>
+          <td>${badge(st)}</td>
+        </tr>
+      `
+    };
+  });
+
+  aplicarTabelaRelatorio();
+}
+
+function renderRelatorioCompras(allProducts) {
+  const needItems = allProducts.filter(p => Number(p.estoqueAtual) < Number(p.estoqueMin));
+  const totalNeedVal = needItems.reduce((sum, p) => sum + Math.max(0, Number(p.estoqueMax) - Number(p.estoqueAtual)) * (Number(p.custo) || 0), 0);
+  const criticalItems = needItems.filter(p => epStatus(p) === 'Crítico' || epStatus(p) === 'Sem estoque');
+  const suppliers = [...new Set(needItems.map(p => p.fornecedor).filter(Boolean))];
+
+  kpi('report-kpis', [
+    { icon: 'shopping-cart', value: needItems.length, label: 'Itens para reposição', color: 'yellow' },
+    { icon: 'wallet-cards', value: money(totalNeedVal), label: 'Investimento estimado' },
+    { icon: 'triangle-alert', value: criticalItems.length, label: 'Alta criticidade', color: 'red' },
+    { icon: 'handshake', value: suppliers.length, label: 'Fornecedores a acionar' }
+  ]);
+
+  // Gráfico: Valor de Reposição por Categoria
+  const catNeedMap = {};
+  needItems.forEach(p => {
+    const cat = p.categoria || 'Outros';
+    const val = Math.max(0, Number(p.estoqueMax) - Number(p.estoqueAtual)) * (Number(p.custo) || 0);
+    catNeedMap[cat] = (catNeedMap[cat] || 0) + val;
+  });
+  const sortedNeedCats = Object.entries(catNeedMap).sort((a, b) => b[1] - a[1]);
+
+  renderGraficoRelatorio('bar', {
+    labels: sortedNeedCats.map(c => c[0]),
+    datasets: [{
+      label: 'Valor de Reposição (R$)',
+      data: sortedNeedCats.map(c => c[1]),
+      backgroundColor: '#f5851f',
+      borderRadius: 6
+    }]
+  }, 'Necessidade Financeira de Compra por Categoria');
+
+  $('report-table-thead').innerHTML = `
+    <tr>
+      <th>Código</th><th>Produto</th><th>Categoria</th><th>Saldo Atual</th><th>Est. Mín.</th><th>Est. Máx.</th><th>Reposição Sugerida</th><th>Custo Unit.</th><th>Total Estimado</th><th>Fornecedor</th><th>Status</th>
+    </tr>
+  `;
+
+  currentReportRows = needItems.map(p => {
+    const qty = Math.max(0, Number(p.estoqueMax) - Number(p.estoqueAtual));
+    const val = qty * (Number(p.custo) || 0);
+    const st = epStatus(p);
+    return {
+      textSearch: `${p.id} ${p.nome} ${p.categoria} ${p.fornecedor || ''}`.toLowerCase(),
+      html: `
+        <tr>
+          <td><strong>${esc(p.id)}</strong></td>
+          <td><strong>${esc(p.nome)}</strong></td>
+          <td><span class="category-pill">${esc(p.categoria)}</span></td>
+          <td>${Number(p.estoqueAtual).toLocaleString('pt-BR')} ${esc(p.unidade)}</td>
+          <td>${Number(p.estoqueMin).toLocaleString('pt-BR')}</td>
+          <td>${Number(p.estoqueMax).toLocaleString('pt-BR')}</td>
+          <td><strong style="color: #ea580c;">+${qty} ${esc(p.unidade)}</strong></td>
+          <td>${money(p.custo)}</td>
+          <td><strong>${money(val)}</strong></td>
+          <td>${esc(p.fornecedor || 'Não informado')}</td>
+          <td>${badge(st)}</td>
+        </tr>
+      `
+    };
+  });
+
+  aplicarTabelaRelatorio();
+}
+
+function renderRelatorioMovimentacoes(allMovements) {
+  const periodDays = Number($('report-period-select')?.value || 0);
+  let filteredMovs = [...allMovements];
+  if (periodDays > 0) {
+    const cutoff = Date.now() - periodDays * 86400000;
+    filteredMovs = filteredMovs.filter(m => new Date(m.data).getTime() >= cutoff);
+  }
+  filteredMovs.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+  const totalIn = filteredMovs.filter(m => m.tipo === 'Entrada').reduce((sum, m) => sum + Math.abs(Number(m.quantidade) || 0), 0);
+  const totalOut = filteredMovs.filter(m => m.tipo === 'Saída').reduce((sum, m) => sum + Math.abs(Number(m.quantidade) || 0), 0);
+  const totalAdj = filteredMovs.filter(m => m.tipo === 'Ajuste').length;
+
+  kpi('report-kpis', [
+    { icon: 'arrow-left-right', value: filteredMovs.length, label: 'Movimentações no período' },
+    { icon: 'arrow-down-to-line', value: totalIn.toLocaleString('pt-BR'), label: 'Volume de entradas', color: 'green' },
+    { icon: 'arrow-up-from-line', value: totalOut.toLocaleString('pt-BR'), label: 'Volume de saídas', color: 'yellow' },
+    { icon: 'wrench', value: totalAdj, label: 'Ajustes de inventário' }
+  ]);
+
+  // Gráfico: Entradas vs Saídas por Data
+  const dateMap = {};
+  filteredMovs.forEach(m => {
+    const day = (m.data || '').slice(0, 10);
+    if (!day) return;
+    if (!dateMap[day]) dateMap[day] = { in: 0, out: 0 };
+    if (m.tipo === 'Entrada') dateMap[day].in += Math.abs(Number(m.quantidade) || 0);
+    if (m.tipo === 'Saída') dateMap[day].out += Math.abs(Number(m.quantidade) || 0);
+  });
+  const sortedDays = Object.keys(dateMap).sort();
+
+  renderGraficoRelatorio('bar', {
+    labels: sortedDays.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })),
+    datasets: [
+      { label: 'Entradas', data: sortedDays.map(d => dateMap[d].in), backgroundColor: '#2563eb', borderRadius: 4 },
+      { label: 'Saídas', data: sortedDays.map(d => dateMap[d].out), backgroundColor: '#f5851f', borderRadius: 4 }
+    ]
+  }, 'Volume Diário de Entradas e Saídas');
+
+  $('report-table-thead').innerHTML = `
+    <tr>
+      <th>Data/Hora</th><th>Tipo</th><th>Código</th><th>Produto</th><th>Quantidade</th><th>Saldo Após</th><th>Local</th><th>Responsável</th><th>Descrição / NF</th>
+    </tr>
+  `;
+
+  currentReportRows = filteredMovs.map(m => {
+    return {
+      textSearch: `${m.data} ${m.tipo} ${m.produtoId} ${m.produto} ${m.responsavel || ''} ${m.descricao || ''}`.toLowerCase(),
+      html: `
+        <tr>
+          <td>${new Date(m.data).toLocaleString('pt-BR')}</td>
+          <td>${badge(m.tipo)}</td>
+          <td><strong>${esc(m.produtoId)}</strong></td>
+          <td><strong>${esc(m.produto)}</strong></td>
+          <td><strong style="color: ${m.tipo === 'Entrada' ? '#16a34a' : m.tipo === 'Saída' ? '#dc2626' : '#64748b'};">${m.quantidade > 0 ? '+' : ''}${m.quantidade}</strong></td>
+          <td>${m.saldoApos ?? '—'}</td>
+          <td>${esc(m.local || '—')}</td>
+          <td>${esc(m.responsavel || 'Sistema')}</td>
+          <td><small>${esc(m.descricao || 'Sem observações')}</small></td>
+        </tr>
+      `
+    };
+  });
+
+  aplicarTabelaRelatorio();
+}
+
+function renderRelatorioFornecedores(allSuppliers) {
+  const approved = allSuppliers.filter(s => s.situacao === 'Aprovado').length;
+  const avgPrazo = allSuppliers.length ? Math.round(allSuppliers.reduce((sum, s) => sum + (Number(s.entregasPrazo) || 0), 0) / allSuppliers.length) : 100;
+  const avgQual = allSuppliers.length ? (allSuppliers.reduce((sum, s) => sum + (Number(s.avaliacao) || 0), 0) / allSuppliers.length).toFixed(1) : '5.0';
+  const totalCompras = allSuppliers.reduce((sum, s) => sum + (Number(s.totalCompras) || 0), 0);
+
+  kpi('report-kpis', [
+    { icon: 'handshake', value: allSuppliers.length, label: 'Fornecedores ativos' },
+    { icon: 'circle-check', value: approved, label: 'Fornecedores homologados', color: 'green' },
+    { icon: 'star', value: `${avgQual} / 5.0`, label: 'Avaliação média geral' },
+    { icon: 'wallet-cards', value: money(totalCompras), label: 'Total acumulado em compras' }
+  ]);
+
+  // Gráfico: Comparativo de Pontualidade (%)
+  renderGraficoRelatorio('bar', {
+    labels: allSuppliers.map(s => s.nome.slice(0, 18)),
+    datasets: [
+      { label: 'Entregas no Prazo (%)', data: allSuppliers.map(s => Number(s.entregasPrazo) || 0), backgroundColor: '#10b981', borderRadius: 5 },
+      { label: 'Qualidade do Material (%)', data: allSuppliers.map(s => Number(s.qualidade) || 0), backgroundColor: '#2563eb', borderRadius: 5 }
+    ]
+  }, 'Desempenho Operacional de Fornecedores (%)');
+
+  $('report-table-thead').innerHTML = `
+    <tr>
+      <th>Fornecedor</th><th>CNPJ</th><th>Categoria</th><th>Avaliação</th><th>Entregas no Prazo</th><th>Qualidade</th><th>Total de Compras</th><th>Última Compra</th><th>Situação</th>
+    </tr>
+  `;
+
+  currentReportRows = allSuppliers.map(s => {
+    const nota = Number(s.avaliacao) || 0;
+    return {
+      textSearch: `${s.nome} ${s.cnpj} ${s.categoria} ${s.situacao}`.toLowerCase(),
+      html: `
+        <tr>
+          <td><strong>${esc(s.nome)}</strong></td>
+          <td><small>${esc(s.cnpj)}</small></td>
+          <td><span class="category-pill">${esc(s.categoria)}</span></td>
+          <td><span class="rating-badge"><i data-lucide="star"></i> ${nota.toFixed(1)}</span></td>
+          <td><strong>${s.entregasPrazo}%</strong></td>
+          <td>${s.qualidade}%</td>
+          <td><strong>${money(s.totalCompras)}</strong></td>
+          <td>${date(s.ultimaCompra)}</td>
+          <td>${badge(s.situacao)}</td>
+        </tr>
+      `
+    };
+  });
+
+  aplicarTabelaRelatorio();
+}
+
+function computeAbcClasses(allProducts) {
+  const sorted = [...allProducts].map(p => ({
+    id: p.id,
+    val: (Number(p.estoqueAtual) || 0) * (Number(p.custo) || 0)
+  })).sort((a, b) => b.val - a.val);
+
+  const total = sorted.reduce((sum, item) => sum + item.val, 0);
+  const map = {};
+  let accumulated = 0;
+
+  sorted.forEach(item => {
+    accumulated += item.val;
+    const share = total > 0 ? (accumulated / total) * 100 : 0;
+    if (share <= 80) {
+      map[item.id] = 'A';
+    } else if (share <= 95) {
+      map[item.id] = 'B';
+    } else {
+      map[item.id] = 'C';
+    }
+  });
+
+  return map;
+}
+
+function renderGraficoRelatorio(chartType, chartData, title) {
+  if ($('report-chart-title')) $('report-chart-title').textContent = title || 'Distribuição Visual';
+  const canvas = $('chart-relatorio-dinamico');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (reportChartInstance) {
+    reportChartInstance.destroy();
+    reportChartInstance = null;
+  }
+
+  reportChartInstance = new Chart(canvas, {
+    type: chartType,
+    data: chartData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: chartType === 'doughnut' ? 'right' : 'top',
+          labels: { font: { family: 'Outfit', size: 12 }, boxWidth: 14 }
+        }
+      },
+      scales: chartType === 'bar' ? {
+        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { family: 'Outfit', size: 11 } } },
+        x: { grid: { display: false }, ticks: { font: { family: 'Outfit', size: 11 } } }
+      } : {}
+    }
+  });
+}
+
+function aplicarTabelaRelatorio() {
+  const tbody = $('report-table-tbody');
+  const countEl = $('report-table-count');
+  const query = ($('report-search-input')?.value || '').toLowerCase().trim();
+
+  if (!tbody) return;
+
+  const filtered = query
+    ? currentReportRows.filter(r => r.textSearch.includes(query))
+    : currentReportRows;
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="12" class="empty-state">Nenhum registro encontrado para a consulta informada.</td></tr>';
+    if (countEl) countEl.textContent = '0 registros encontrados';
+  } else {
+    tbody.innerHTML = filtered.map(r => r.html).join('');
+    if (countEl) countEl.textContent = `Mostrando ${filtered.length} de ${currentReportRows.length} registro(s)`;
+  }
+}
+
+function filtrarDadosRelatorio() {
+  aplicarTabelaRelatorio();
+  refreshInterfaceIcons();
+}
+
+function atualizarPeriodoRelatorio(value) {
+  carregarDadosRelatorio(selectedReportType);
+}
+
+function exportarRelatorioAtual() {
+  const report = reportTypes[selectedReportType];
+  if (!report) return;
+
+  let filename = `relatorio-${selectedReportType}`;
+  let csvContent = '';
+
+  if (selectedReportType === 'stock') {
+    csvContent = montarCsvProdutos();
+    filename = 'relatorio-posicao-estoque';
+  } else if (selectedReportType === 'purchases') {
+    const need = products().filter(p => Number(p.estoqueAtual) < Number(p.estoqueMin));
+    const rows = need.map(p => [
+      csvText(p.id),
+      csvText(p.nome),
+      csvText(p.categoria),
+      csvNumber(p.estoqueAtual),
+      csvNumber(p.estoqueMin),
+      csvNumber(p.estoqueMax),
+      csvNumber(Math.max(0, Number(p.estoqueMax) - Number(p.estoqueAtual))),
+      csvNumber(p.custo),
+      csvNumber(Math.max(0, Number(p.estoqueMax) - Number(p.estoqueAtual)) * (Number(p.custo) || 0)),
+      csvText(p.fornecedor || 'Não informado'),
+      csvText(epStatus(p))
+    ]);
+    csvContent = genericCsv(['Código', 'Produto', 'Categoria', 'Estoque Atual', 'Estoque Mínimo', 'Estoque Máximo', 'Reposição Sugerida', 'Custo Unitário (R$)', 'Total Estimado (R$)', 'Fornecedor', 'Status'], rows);
+    filename = 'relatorio-necessidade-compra';
+  } else if (selectedReportType === 'movements') {
+    const movs = DB.get('movimentacoes') || [];
+    const rows = movs.map(m => [
+      csvText(new Date(m.data).toLocaleString('pt-BR')),
+      csvText(m.tipo),
+      csvText(m.produtoId),
+      csvText(m.produto),
+      csvNumber(m.quantidade),
+      csvNumber(m.saldoApos),
+      csvText(m.local || '—'),
+      csvText(m.responsavel || 'Sistema'),
+      csvText(m.descricao || '—')
+    ]);
+    csvContent = genericCsv(['Data/Hora', 'Tipo', 'Código', 'Produto', 'Quantidade', 'Saldo Após', 'Local', 'Responsável', 'Descrição'], rows);
+    filename = 'relatorio-movimentacoes';
+  } else if (selectedReportType === 'suppliers') {
+    const fs = DB.get('fornecedores') || [];
+    const rows = fs.map(s => [
+      csvText(s.nome),
+      csvText(s.cnpj),
+      csvText(s.categoria),
+      csvNumber(s.avaliacao),
+      csvNumber(s.entregasPrazo),
+      csvNumber(s.qualidade),
+      csvNumber(s.totalCompras),
+      csvText(date(s.ultimaCompra)),
+      csvText(s.situacao)
+    ]);
+    csvContent = genericCsv(['Fornecedor', 'CNPJ', 'Categoria', 'Avaliação', 'Entregas no Prazo (%)', 'Qualidade (%)', 'Total Comprado (R$)', 'Última Compra', 'Situação'], rows);
+    filename = 'relatorio-fornecedores';
+  }
+
+  downloadCsvReport(filename, csvContent);
+
+  const history = DB.get('relatorios') || [];
+  history.unshift({
+    id: Date.now(),
+    nome: report.name,
+    data: new Date().toISOString(),
+    responsavel: state.user?.nome || 'Administrador',
+    formato: 'CSV'
+  });
+  DB.set('relatorios', history.slice(0, 15));
+  Security.logAudit('RELATORIO_EXPORTADO', `Relatório "${report.name}" exportado em CSV.`);
+  renderRecentReports();
+  toast(`${report.name} exportado com sucesso!`, 'success');
+}
+
+function imprimirRelatorioAtual() {
+  const report = reportTypes[selectedReportType];
+  Security.logAudit('RELATORIO_IMPRESSO', `Impressão do relatório: ${report?.name || selectedReportType}`);
+  window.print();
+}
+
+async function copiarResumoRelatorio() {
+  const report = reportTypes[selectedReportType];
+  if (!report) return;
+
+  const kpis = document.querySelectorAll('#report-kpis .kpi-card');
+  let kpiText = '';
+  kpis.forEach(card => {
+    const label = card.querySelector('.kpi-label')?.textContent || '';
+    const val = card.querySelector('.kpi-val')?.textContent || '';
+    kpiText += `• ${label}: ${val}\n`;
+  });
+
+  const summary = `📊 *${report.name} - EngePro Gestão de Estoque*\nData: ${new Date().toLocaleString('pt-BR')}\n\n*Principais Indicadores:*\n${kpiText}\nGerado pelo sistema de estoque EngePro.`;
+
+  try {
+    await navigator.clipboard.writeText(summary);
+    toast('Resumo copiado para a área de transferência!', 'success');
+  } catch {
+    toast('Não foi possível copiar automaticamente.', 'error');
+  }
+}
+
 function renderRecentReports() {
-  const recent = DB.get('relatorios').slice(0, 6);
-  $('relat-tbody').innerHTML = recent.length
-    ? recent.map(report => `<tr><td><strong>${esc(report.nome)}</strong></td><td>${new Date(report.data).toLocaleString('pt-BR')}</td><td><span class="format-pill">${esc(report.formato || 'CSV')}</span></td></tr>`).join('')
-    : '<tr><td colspan="3" class="empty-state">Nenhum relatório gerado ainda.</td></tr>';
+  const recent = DB.get('relatorios') || [];
+  const tbody = $('relat-tbody');
+  if (!tbody) return;
+
+  if (!recent.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state">Nenhum relatório exportado recentemente.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = recent.slice(0, 6).map(r => `
+    <tr>
+      <td><strong>${esc(r.nome)}</strong></td>
+      <td>${new Date(r.data).toLocaleString('pt-BR')}</td>
+      <td>${esc(r.responsavel || 'Administrador')}</td>
+      <td><span class="format-pill">${esc(r.formato || 'CSV')}</span></td>
+      <td>
+        <button type="button" class="btn-icon" title="Exportar novamente" onclick="selecionarRelatorioPeloNome('${esc(r.nome)}')"><i data-lucide="download"></i></button>
+      </td>
+    </tr>
+  `).join('');
+  refreshInterfaceIcons();
+}
+
+function selecionarRelatorioPeloNome(nome) {
+  const entry = Object.entries(reportTypes).find(([, r]) => r.name === nome);
+  if (entry) {
+    selecionarRelatorio(entry[0], document.querySelector(`#relat-cards .relat-card:nth-child(${Object.keys(reportTypes).indexOf(entry[0]) + 1})`));
+  }
 }
 
 function genericCsv(headers, rows) {
@@ -1208,46 +1710,6 @@ function downloadCsvReport(filename, content) {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function filteredMovementsByPeriod() {
-  const selectedDays = Number($('report-period')?.value || 0);
-  if (!selectedDays) return DB.get('movimentacoes');
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - selectedDays);
-  return DB.get('movimentacoes').filter(movement => new Date(movement.data) >= cutoff);
-}
-
-function gerarRelatorioSelecionado() {
-  const report = reportTypes[selectedReportType];
-  let content = '';
-  let filename = '';
-  if (selectedReportType === 'stock') {
-    content = montarCsvProdutos();
-    filename = 'relatorio-posicao-estoque';
-  }
-  if (selectedReportType === 'purchases') {
-    const rows = products().filter(product => epStatus(product) !== 'Normal').map(product => [csvText(product.id), csvText(product.nome), csvText(epStatus(product)), csvNumber(product.estoqueAtual), csvNumber(product.estoqueMin), csvNumber(product.estoqueMax), csvNumber(Math.max(0, Number(product.estoqueMax) - Number(product.estoqueAtual))), csvNumber(Math.max(0, Number(product.estoqueMax) - Number(product.estoqueAtual)) * Number(product.custo)), csvText(product.fornecedor)]);
-    content = genericCsv(['Código','Produto','Status','Estoque atual','Estoque mínimo','Estoque máximo','Reposição sugerida','Valor estimado (R$)','Fornecedor'], rows);
-    filename = 'relatorio-necessidade-compra';
-  }
-  if (selectedReportType === 'movements') {
-    const rows = filteredMovementsByPeriod().map(movement => [csvText(movement.data), csvText(movement.tipo), csvText(movement.produtoId), csvText(movement.produto), csvNumber(movement.quantidade), csvNumber(movement.saldoApos), csvText(movement.local), csvText(movement.responsavel), csvText(movement.descricao)]);
-    content = genericCsv(['Data','Tipo','Código','Produto','Quantidade','Saldo após','Local','Responsável','Descrição'], rows);
-    filename = 'relatorio-movimentacoes';
-  }
-  if (selectedReportType === 'suppliers') {
-    const rows = DB.get('fornecedores').map(supplier => [csvText(supplier.nome), csvText(supplier.cnpj), csvText(supplier.categoria), csvNumber(supplier.avaliacao), csvNumber(supplier.entregasPrazo), csvNumber(supplier.qualidade), csvText(supplier.situacao), csvNumber(supplier.totalCompras)]);
-    content = genericCsv(['Fornecedor','CNPJ','Categoria','Avaliação','Entregas no prazo (%)','Qualidade (%)','Situação','Total de compras (R$)'], rows);
-    filename = 'relatorio-fornecedores';
-  }
-  downloadCsvReport(filename, content);
-  const history = DB.get('relatorios');
-  history.unshift({ id: Date.now(), nome: report.name, data: new Date().toISOString(), formato: 'CSV' });
-  DB.set('relatorios', history.slice(0, 20));
-  Security.logAudit('RELATORIO_GERADO', `Relatório exportado: ${report.name} (${filename}.csv).`);
-  renderRecentReports();
-  toast(`${report.name} gerado com sucesso.`, 'success');
 }
 
 function refreshInterfaceIcons() {

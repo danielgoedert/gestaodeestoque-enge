@@ -1352,32 +1352,9 @@ function salvarAvaliacao(e, id) {
 
 // ===== RELATÓRIOS =====
 function renderRelatorios() {
-  const cards = [
-    ['package', 'Posição de estoque', 'Saldo, valor e nível atual dos produtos'],
-    ['arrow-left-right', 'Movimentações', 'Entradas e saídas agrupadas por período'],
-    ['shopping-cart', 'Necessidade de compra', 'Itens abaixo do estoque mínimo'],
-    ['handshake', 'Desempenho de fornecedores', 'Avaliações, entregas e qualidade']
-  ];
-
-  const grid = $('relat-cards');
-  if (grid) {
-    grid.innerHTML = cards.map(c => `
-      <div class="relatorio-card" onclick="gerarRelatorio('${esc(c[1])}')">
-        <div class="rc-icon"><i data-lucide="${esc(c[0])}"></i></div>
-        <h4>${esc(c[1])}</h4>
-        <p>${esc(c[2])}</p>
-      </div>
-    `).join('');
-  }
-  refreshIcons();
-}
-
-function gerarRelatorio(tipo) {
-  if (typeof gerarRelatorioSelecionado === 'function') {
-    gerarRelatorioSelecionado();
-  } else {
-    toast(`Relatório "${tipo}" gerado com sucesso.`, 'success');
-    Security.logAudit('RELATORIO_GERADO', `Relatório gerado: ${tipo}`);
+  if (typeof window.renderRelatorios === 'function' && window.renderRelatorios !== renderRelatorios) {
+    window.renderRelatorios();
+    return;
   }
 }
 
