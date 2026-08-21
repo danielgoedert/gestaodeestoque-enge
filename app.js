@@ -423,7 +423,24 @@ document.addEventListener('click', e => {
   }
 });
 
+function toggleMobileSidebar() {
+  const sidebar = $('sidebar');
+  const overlay = $('sidebar-overlay');
+  if (!sidebar) return;
+  const isOpen = sidebar.classList.toggle('mobile-open');
+  if (overlay) overlay.classList.toggle('active', isOpen);
+  refreshIcons();
+}
+
+function closeMobileSidebar() {
+  const sidebar = $('sidebar');
+  const overlay = $('sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('mobile-open');
+  if (overlay) overlay.classList.remove('active');
+}
+
 function navigate(page, el) {
+  closeMobileSidebar();
   if (page === 'configuracoes' && !Security.can('view_settings')) {
     return toast('Acesso negado: apenas administradores podem acessar as configurações.', 'error');
   }

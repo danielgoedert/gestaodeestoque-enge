@@ -121,15 +121,19 @@
       </div>
     </div>
   </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
 
   <!-- MAIN CONTENT -->
   <main class="main-content">
 
     <!-- TOPBAR -->
     <header class="topbar">
-      <div class="topbar-search">
-        <span><i data-lucide="search"></i></span>
-        <input type="text" placeholder="Buscar produtos, categorias, pedidos..." id="global-search" maxlength="100">
+      <div class="topbar-left-cluster">
+        <button type="button" class="mobile-menu-btn" id="mobile-menu-btn" onclick="toggleMobileSidebar()" aria-label="Abrir menu lateral"><i data-lucide="menu"></i></button>
+        <div class="topbar-search">
+          <span><i data-lucide="search"></i></span>
+          <input type="text" placeholder="Buscar produtos, categorias..." id="global-search" maxlength="100">
+        </div>
       </div>
       <div class="topbar-actions">
         <div class="notif-wrapper">
