@@ -1396,7 +1396,7 @@ function renderConfiguracoes() {
         <td>${esc(u.email)}</td>
         <td>${badge(u.perfil)}</td>
         <td>
-          <button class="btn-icon" title="Editar usuário" onclick="abrirModalUsuario('${Security.sanitizeId(u.email)}')"><i data-lucide="edit-2"></i></button>
+          <button class="btn-icon" title="Editar usuário" onclick="abrirModalUsuario('${Security.sanitizeId(u.email)}')"><i data-lucide="pencil"></i></button>
           ${us.length > 1 && u.email !== state.user?.email ? `<button class="btn-icon" title="Excluir usuário" onclick="excluirUsuario('${Security.sanitizeId(u.email)}')"><i data-lucide="trash-2"></i></button>` : ''}
         </td>
       </tr>
@@ -1409,7 +1409,7 @@ function renderConfiguracoes() {
     catList.innerHTML = cats.map(c => `
       <div class="cat-item">
         <span>${esc(c)}</span>
-        <button class="btn-icon" title="Categoria protegida" onclick="toast('Categorias padrão protegidas.')"><i data-lucide="lock"></i></button>
+        <span class="cat-lock-icon" title="Categoria do sistema"><i data-lucide="lock"></i></span>
       </div>
     `).join('');
   }
@@ -1417,6 +1417,41 @@ function renderConfiguracoes() {
   renderAuditLogs();
   refreshIcons();
 }
+
+const auditStatusMap = {
+  'SUCCESS': { label: 'Sucesso', badge: 'normal' },
+  'FAILURE': { label: 'Falha', badge: 'atencao' },
+  'CRITICAL': { label: 'Crítico', badge: 'critico' },
+  'INFO': { label: 'Informativo', badge: 'ajuste' }
+};
+
+const auditActionMap = {
+  'LOGIN_SUCESSO': 'Login realizado',
+  'LOGIN_FALHOU': 'Falha no login',
+  'LOGIN_BLOQUEADO_RATE_LIMIT': 'Bloqueio por tentativas',
+  'LOGOUT': 'Encerramento de sessão',
+  'SISTEMA_INICIALIZADO': 'Inicialização do sistema',
+  'SISTEMA_MIGRACAO_SENHAS': 'Migração de senhas',
+  'PRODUTO_CRIADO': 'Cadastro de produto',
+  'PRODUTO_ATUALIZADO': 'Atualização de produto',
+  'PRODUTO_EXCLUIDO': 'Exclusão de produto',
+  'IMPORTACAO_PLANILHA': 'Importação de planilha',
+  'EXPORTACAO_CSV': 'Exportação CSV',
+  'MOVIMENTACAO_REGISTRADA': 'Registro de movimentação',
+  'PEDIDO_COMPRA_CRIADO': 'Pedido de compra',
+  'FORNECEDOR_CRIADO': 'Cadastro de fornecedor',
+  'FORNECEDOR_AVALIADO': 'Avaliação de fornecedor',
+  'USUARIO_CRIADO': 'Cadastro de usuário',
+  'USUARIO_ATUALIZADO': 'Atualização de usuário',
+  'USUARIO_EXCLUIDO': 'Exclusão de usuário',
+  'SENHA_REDEFINIDA': 'Redefinição de senha',
+  'CATEGORIA_CRIADA': 'Cadastro de categoria',
+  'AUTOMACAO_CRIADA': 'Cadastro de automação',
+  'AUTOMACAO_ALTERADA': 'Alteração de automação',
+  'AUTOMACAO_EXCLUIDA': 'Exclusão de automação',
+  'SQL_INJECTION_DETECTADA': 'Tentativa anti-SQL bloqueada',
+  'AUDIT_LOGS_EXPORTED': 'Exportação de auditoria'
+};
 
 function renderAuditLogs() {
   const container = $('audit-logs-container');
@@ -1436,16 +1471,20 @@ function renderAuditLogs() {
         <table class="tbl" id="audit-tbl">
           <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Perfil</th><th>Ação</th><th>Status</th><th>Detalhes</th></tr></thead>
           <tbody>
-            ${logs.length ? logs.map(l => `
-              <tr>
-                <td><small>${new Date(l.timestamp).toLocaleString('pt-BR')}</small></td>
-                <td><strong>${esc(l.actorName)}</strong></td>
-                <td><span class="badge ${l.actorPerfil === 'Administrador' ? 'normal' : 'ajuste'}">${esc(l.actorPerfil)}</span></td>
-                <td><code>${esc(l.action)}</code></td>
-                <td><span class="badge ${l.status === 'SUCCESS' ? 'normal' : l.status === 'CRITICAL' ? 'critico' : 'atencao'}">${esc(l.status)}</span></td>
-                <td><small>${esc(l.details)}</small></td>
-              </tr>
-            `).join('') : '<tr><td colspan="6" class="empty-state">Nenhum log registrado ainda.</td></tr>'}
+            ${logs.length ? logs.map(l => {
+              const st = auditStatusMap[l.status] || { label: l.status, badge: 'normal' };
+              const actName = auditActionMap[l.action] || l.action;
+              return `
+                <tr>
+                  <td><small>${new Date(l.timestamp).toLocaleString('pt-BR')}</small></td>
+                  <td><strong>${esc(l.actorName)}</strong></td>
+                  <td><span class="badge ${l.actorPerfil === 'Administrador' ? 'normal' : 'ajuste'}">${esc(l.actorPerfil)}</span></td>
+                  <td><strong>${esc(actName)}</strong><br><small style="color: var(--text2); font-size: 10.5px;">${esc(l.action)}</small></td>
+                  <td><span class="badge ${st.badge}">${esc(st.label)}</span></td>
+                  <td><small>${esc(l.details)}</small></td>
+                </tr>
+              `;
+            }).join('') : '<tr><td colspan="6" class="empty-state">Nenhum registro de auditoria no momento.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1457,17 +1496,21 @@ function renderAuditLogs() {
 function exportarLogsAuditoria() {
   const logs = DB.get('audit_log') || [];
   const headers = ['ID', 'Data/Hora', 'Usuário', 'E-mail', 'Perfil', 'Ação', 'Status', 'Detalhes', 'User-Agent'];
-  const rows = logs.map(l => [
-    Security.sanitizeCsvCell(l.id),
-    Security.sanitizeCsvCell(new Date(l.timestamp).toLocaleString('pt-BR')),
-    Security.sanitizeCsvCell(l.actorName),
-    Security.sanitizeCsvCell(l.actorEmail),
-    Security.sanitizeCsvCell(l.actorPerfil),
-    Security.sanitizeCsvCell(l.action),
-    Security.sanitizeCsvCell(l.status),
-    Security.sanitizeCsvCell(l.details),
-    Security.sanitizeCsvCell(l.userAgent)
-  ]);
+  const rows = logs.map(l => {
+    const st = auditStatusMap[l.status]?.label || l.status;
+    const act = auditActionMap[l.action] || l.action;
+    return [
+      Security.sanitizeCsvCell(l.id),
+      Security.sanitizeCsvCell(new Date(l.timestamp).toLocaleString('pt-BR')),
+      Security.sanitizeCsvCell(l.actorName),
+      Security.sanitizeCsvCell(l.actorEmail),
+      Security.sanitizeCsvCell(l.actorPerfil),
+      Security.sanitizeCsvCell(`${act} (${l.action})`),
+      Security.sanitizeCsvCell(st),
+      Security.sanitizeCsvCell(l.details),
+      Security.sanitizeCsvCell(l.userAgent)
+    ];
+  });
   const content = `sep=;\r\n${headers.map(h => Security.sanitizeCsvCell(h)).join(';')}\r\n${rows.map(r => r.join(';')).join('\r\n')}`;
   downloadCsvReport('trilha-auditoria-seguranca', content);
   Security.logAudit('AUDIT_LOGS_EXPORTED', 'Exportação da trilha de auditoria para CSV.');
@@ -1495,8 +1538,8 @@ function abrirModalUsuario(email = null) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>${email ? 'Nova Senha (deixe em branco para manter)' : 'Senha Inicial *'}</label>
-          <input type="password" id="u-senha" placeholder="${email ? '••••••••' : 'Mínimo 6 caracteres'}" ${email ? '' : 'required'} minlength="6" maxlength="100">
+          <label>${email ? 'Nova Senha' : 'Senha Inicial *'}</label>
+          <input type="password" id="u-senha" placeholder="${email ? 'Deixe em branco para manter' : 'Mínimo 6 caracteres'}" ${email ? '' : 'required'} minlength="6" maxlength="100">
         </div>
         <div class="form-group">
           <label>Perfil de Acesso *</label>

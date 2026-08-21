@@ -1157,10 +1157,16 @@ const reportTypes = {
   movements: { icon: 'arrow-left-right', name: 'Movimentações', description: 'Entradas, saídas e ajustes registrados.' },
   suppliers: { icon: 'handshake', name: 'Fornecedores', description: 'Cadastro, avaliação e desempenho de entrega.' }
 };
-let selectedReportType = 'stock';
-
 renderRelatorios = function () {
-  $('relat-cards').innerHTML = Object.entries(reportTypes).map(([key, report]) => `<button class="relat-card ${key === selectedReportType ? 'selected' : ''}" onclick="selecionarRelatorio('${key}',this)"><div class="rc-icon" aria-hidden="true"><i data-lucide="${report.icon}"></i></div><h4>${report.name}</h4><p>${report.description}</p></button>`).join('');
+  $('relat-cards').innerHTML = Object.entries(reportTypes).map(([key, report]) => `
+    <button type="button" class="relat-card ${key === selectedReportType ? 'selected' : ''}" onclick="selecionarRelatorio('${key}',this)">
+      <div class="rc-icon" aria-hidden="true"><i data-lucide="${report.icon}"></i></div>
+      <div class="rc-info">
+        <h4>${report.name}</h4>
+        <p>${report.description}</p>
+      </div>
+    </button>
+  `).join('');
   atualizarPainelRelatorio();
   renderRecentReports();
 };
@@ -1184,7 +1190,7 @@ function atualizarPainelRelatorio() {
 function renderRecentReports() {
   const recent = DB.get('relatorios').slice(0, 6);
   $('relat-tbody').innerHTML = recent.length
-    ? recent.map(report => `<tr><td><strong>${esc(report.nome)}</strong></td><td>${new Date(report.data).toLocaleString('pt-BR')}</td><td><span class="badge ajuste">${esc(report.formato || 'CSV')}</span></td></tr>`).join('')
+    ? recent.map(report => `<tr><td><strong>${esc(report.nome)}</strong></td><td>${new Date(report.data).toLocaleString('pt-BR')}</td><td><span class="format-pill">${esc(report.formato || 'CSV')}</span></td></tr>`).join('')
     : '<tr><td colspan="3" class="empty-state">Nenhum relatório gerado ainda.</td></tr>';
 }
 
