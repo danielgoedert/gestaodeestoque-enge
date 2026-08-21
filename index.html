@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self'; object-src 'none'; base-uri 'self';">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<title>EngePro | Gestão de Estoque</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ========== LOGIN ========== -->
+<div id="page-login" class="page active">
+  <div class="login-bg">
+    <div class="login-left">
+      <div class="login-left-content">
+      <div class="brand-big">
+        <img class="brand-logo brand-logo-login" src="assets/logo-engepro-branca.png" alt="EngePro">
+          <div class="gear-icon"><i data-lucide="settings"></i></div>
+          <div>
+            <span class="brand-enge">Enge</span><span class="brand-pro">Pro</span>
+            <div class="brand-sub">consultoria jr.</div>
+          </div>
+        </div>
+        <h1 class="login-title">Gestão de Estoque</h1>
+        <p class="login-desc">Controle seu estoque com clareza, precisão e inteligência.</p>
+        <div class="login-stats">
+          <div class="ls-item"><span class="ls-num">2.842</span><span class="ls-label">Itens cadastrados</span></div>
+          <div class="ls-item"><span class="ls-num">R$ 1,2M</span><span class="ls-label">Valor em estoque</span></div>
+          <div class="ls-item"><span class="ls-num">98%</span><span class="ls-label">Precisão do inventário</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="login-card">
+        <div class="lc-icon"><i data-lucide="shield-check"></i></div>
+        <h2>Entrar</h2>
+        <p class="lc-sub">Acesse sua conta para continuar</p>
+        <form id="form-login" onsubmit="doLogin(event)">
+          <div class="form-group">
+            <label>E-mail</label>
+            <div class="input-icon">
+              <span><i data-lucide="mail"></i></span>
+              <input type="email" id="login-email" placeholder="seu@email.com" required maxlength="100" autocomplete="username">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Senha</label>
+            <div class="input-icon">
+              <span><i data-lucide="key-round"></i></span>
+              <input type="password" id="login-senha" placeholder="••••••••" required maxlength="100" autocomplete="current-password">
+              <button type="button" class="btn-eye" onclick="togglePass()" aria-label="Mostrar ou ocultar senha"><i data-lucide="eye"></i></button>
+            </div>
+          </div>
+          <div class="login-options">
+            <label class="checkbox-label"><input type="checkbox" id="remember"> Lembrar de mim</label>
+            <a href="#" class="link-forgot" onclick="abrirModalEsqueciSenha()">Esqueci minha senha</a>
+          </div>
+          <button type="submit" class="btn-primary w100">Entrar</button>
+        </form>
+        <div class="login-footer">Precisa de ajuda? <a href="https://engeproconsultoria.com.br/fale-conosco/" target="_blank" rel="noopener noreferrer">Fale com a EngePro</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== APP SHELL ========== -->
+<div id="app" class="app hidden">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand" onclick="navigate('dashboard')" style="cursor:pointer;">
+      <img class="brand-logo brand-logo-sidebar" src="assets/logo-engepro-branca.png" alt="EngePro">
+      <div class="sb-gear"><i data-lucide="settings"></i></div>
+      <div>
+        <span class="sb-enge">Enge</span><span class="sb-pro">Pro</span>
+        <div class="sb-sub">consultoria jr.</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard" onclick="navigate('dashboard',this)">
+        <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-page="produtos" onclick="navigate('produtos',this)">
+        <span class="nav-icon"><i data-lucide="package"></i></span><span>Produtos</span>
+      </a>
+      <a href="#" class="nav-item" data-page="estoque" onclick="navigate('estoque',this)">
+        <span class="nav-icon"><i data-lucide="warehouse"></i></span><span>Estoque</span>
+      </a>
+      <a href="#" class="nav-item" data-page="movimentacoes" onclick="navigate('movimentacoes',this)">
+        <span class="nav-icon"><i data-lucide="arrow-left-right"></i></span><span>Movimentações</span>
+      </a>
+      <a href="#" class="nav-item" data-page="compras" onclick="navigate('compras',this)">
+        <span class="nav-icon"><i data-lucide="shopping-cart"></i></span><span>Compras</span>
+      </a>
+      <a href="#" class="nav-item" data-page="fornecedores" onclick="navigate('fornecedores',this)">
+        <span class="nav-icon"><i data-lucide="handshake"></i></span><span>Fornecedores</span>
+      </a>
+      <a href="#" class="nav-item" data-page="relatorios" onclick="navigate('relatorios',this)">
+        <span class="nav-icon"><i data-lucide="chart-no-axes-combined"></i></span><span>Relatórios</span>
+      </a>
+      <a href="#" class="nav-item" data-page="automacoes" onclick="navigate('automacoes',this)">
+        <span class="nav-icon"><i data-lucide="zap"></i></span><span>Automações</span>
+      </a>
+    </nav>
+    <div class="sidebar-bottom">
+      <a href="#" class="nav-item" data-page="configuracoes" onclick="navigate('configuracoes',this)">
+        <span class="nav-icon"><i data-lucide="settings"></i></span><span>Configurações</span>
+      </a>
+      <div class="user-info" id="sidebar-user">
+        <div class="user-avatar" id="user-avatar-sb">AD</div>
+        <div class="user-details">
+          <span class="user-name" id="user-name-sb">Admin</span>
+          <span class="user-role" id="user-role-sb">Administrador</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main-content">
+
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar-search">
+        <span><i data-lucide="search"></i></span>
+        <input type="text" placeholder="Buscar produtos, categorias, pedidos..." id="global-search" maxlength="100">
+      </div>
+      <div class="topbar-actions">
+        <div class="notif-wrapper">
+          <div class="notif-btn" id="notif-trigger-btn" onclick="toggleNotif(event)" title="Notificações de estoque">
+            <i data-lucide="bell"></i><span class="notif-badge" id="notif-badge">0</span>
+          </div>
+          <div class="notif-dropdown" id="notif-dropdown">
+            <div class="notif-dropdown-header">
+              <strong>Notificações de Estoque</strong>
+              <button type="button" class="btn-icon" onclick="limparNotificacoes(event)" title="Limpar avisos"><i data-lucide="check-check"></i></button>
+            </div>
+            <div class="notif-dropdown-body" id="notif-list"></div>
+            <div class="notif-dropdown-footer">
+              <button type="button" class="btn-outline sm w100" onclick="navigate('estoque');fecharNotif()">Ver Central de Estoque</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="topbar-user" onclick="toggleUserMenu()">
+          <div class="user-avatar sm" id="topbar-avatar">AD</div>
+          <span id="topbar-username">Admin</span>
+          <span><i data-lucide="chevron-down"></i></span>
+          <div class="user-dropdown" id="user-dropdown">
+            <a href="#" onclick="navigate('configuracoes')"><i data-lucide="settings"></i> Configurações</a>
+            <a href="#" onclick="doLogout()"><i data-lucide="log-out"></i> Sair</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PAGES -->
+    <div class="pages-container">
+
+      <!-- DASHBOARD -->
+      <section id="pg-dashboard" class="pg active">
+        <div class="pg-header">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="pg-sub">Visão geral do estoque</p>
+          </div>
+        </div>
+        <div class="kpi-row" id="dash-kpis"></div>
+        <div id="dash-resumo-operacional"></div>
+        <section class="card performance-dashboard-card" aria-labelledby="performance-title">
+          <div class="performance-section-header">
+            <div>
+              <span class="chart-eyebrow">INDICADORES DE PERFORMANCE</span>
+              <h2 id="performance-title">Indicadores de estoque</h2>
+              <p>Leitura rápida da ocupação, eficiência e nível de serviço da operação.</p>
+            </div>
+            <span class="performance-live-note"><i data-lucide="refresh-cw"></i> Atualizado com o estoque atual</span>
+          </div>
+          <div class="performance-layout">
+            <div class="performance-gauge-grid" id="dash-performance-gauges"></div>
+          </div>
+        </section>
+        <div class="dashboard-analytics-grid">
+          <article class="card chart-panel chart-panel-movements">
+            <div class="chart-panel-header">
+              <div><span class="chart-eyebrow">MOVIMENTAÇÃO</span><h2>Fluxo de entradas e saídas</h2><p>Entradas aparecem acima da linha central; saídas e ajustes, abaixo.</p></div>
+              <select class="select-sm" aria-label="Período do gráfico" onchange="setDashboardPeriod(this.value)"><option value="30">Últimos 30 dias</option><option value="7">Últimos 7 dias</option></select>
+            </div>
+            <div class="chart-stat-row">
+              <div><span class="chart-stat-dot blue"></span><span>Entradas</span><strong id="dash-entries-total">0</strong></div>
+              <div><span class="chart-stat-dot orange"></span><span>Saídas</span><strong id="dash-exits-total">0</strong></div>
+              <div><span class="chart-stat-dot gray"></span><span>Ajustes</span><strong id="dash-adjustments-total">0</strong></div>
+              <div><span class="chart-stat-dot green"></span><span>Saldo do período</span><strong id="dash-balance-total">0</strong></div>
+            </div>
+            <div class="dashboard-comparison-strip" id="dash-period-comparison"></div>
+            <div class="chart-canvas-large"><canvas id="chart-entradas-saidas" title="Entradas, saídas e saldo diário do estoque"></canvas></div>
+            <p class="chart-interaction-hint">Cada coluna representa uma movimentação real. Passe o mouse para ver os valores da data.</p>
+          </article>
+
+          <article class="card chart-panel chart-panel-categories">
+            <div class="chart-panel-header"><div><span class="chart-eyebrow">COMPOSIÇÃO</span><h2>Estoque por categoria</h2><p>Participação de cada categoria no valor total armazenado.</p></div></div>
+            <div class="category-chart-wrap"><canvas id="chart-categorias" title="Composição do estoque por categoria"></canvas></div>
+          </article>
+
+          <article class="card chart-panel chart-panel-value">
+            <div class="chart-panel-header"><div><span class="chart-eyebrow">VALOR IMOBILIZADO</span><h2>Valor por categoria</h2><p>Veja onde está concentrado o capital do estoque.</p></div></div>
+            <div class="chart-canvas-medium"><canvas id="chart-valor-categorias" title="Valor de estoque por categoria"></canvas></div>
+          </article>
+
+          <article class="card dashboard-actions-card">
+            <div class="card-header"><div><span class="chart-eyebrow">PRIORIDADES</span><span class="card-title">Ações recomendadas</span></div></div>
+            <div id="dash-acoes"></div>
+          </article>
+
+          <article class="card dashboard-abc-card">
+            <div class="card-header"><div><span class="chart-eyebrow">CURVA ABC</span><span class="card-title">Distribuição de valor</span></div></div>
+            <div id="dash-curva-abc" class="abc-container"></div>
+          </article>
+
+          <article class="card dashboard-attention-card">
+          <div class="card-header">
+            <span class="card-title">Produtos que exigem atenção</span>
+            <a href="#" class="link-sm" onclick="navigate('produtos')">Ver todos</a>
+          </div>
+          <div class="table-wrap"><table class="tbl" id="dash-atencao-tbl">
+            <thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Mínimo</th><th>Status</th><th>Última mov.</th></tr></thead>
+            <tbody></tbody>
+          </table></div>
+          </article>
+        </div>
+      </section>
+
+      <!-- PRODUTOS -->
+      <section id="pg-produtos" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Produtos</h1>
+            <p class="pg-sub">Gerencie todos os produtos e itens do seu estoque</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn-outline" onclick="abrirModalImportarProdutos()"><i data-lucide="upload"></i> Importar</button>
+            <button class="btn-outline" onclick="exportarProdutos()"><i data-lucide="download"></i> Exportar</button>
+            <button class="btn-primary" onclick="abrirModalProduto()">+ Novo produto</button>
+          </div>
+        </div>
+        <div class="kpi-row" id="prod-kpis"></div>
+        <div class="card">
+          <div class="filters-bar">
+            <div class="input-icon search-filter">
+              <span><i data-lucide="search"></i></span>
+              <input type="text" id="prod-search" placeholder="Buscar por código, nome ou descrição..." oninput="filtrarProdutos()" maxlength="100">
+            </div>
+            <select id="prod-cat" onchange="filtrarProdutos()" class="select-md"><option value="">Categoria: Todas</option></select>
+            <select id="prod-status" onchange="filtrarProdutos()" class="select-md">
+              <option value="">Status: Todos</option>
+              <option value="Normal">Normal</option>
+              <option value="Atenção">Atenção</option>
+              <option value="Crítico">Crítico</option>
+              <option value="Sem estoque">Sem estoque</option>
+            </select>
+            <select id="prod-local" onchange="filtrarProdutos()" class="select-md"><option value="">Local: Todos</option></select>
+            <select id="prod-fornecedor" onchange="filtrarProdutos()" class="select-md"><option value="">Fornecedor: Todos</option></select>
+            <button class="btn-outline" onclick="toggleFiltrosAvancados()"><i data-lucide="rotate-ccw"></i> Limpar Filtros</button>
+          </div>
+          <div class="table-wrap">
+            <table class="tbl" id="produtos-tbl">
+              <thead><tr><th>Código</th><th>Produto</th><th>Categoria</th><th>Unidade</th><th>Estoque atual</th><th>Est. mín.</th><th>Est. máx.</th><th>Status</th><th>Ações</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="prod-pagination"></div>
+        </div>
+      </section>
+
+      <!-- ESTOQUE -->
+      <section id="pg-estoque" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Estoque</h1>
+            <p class="pg-sub">Visão geral</p>
+          </div>
+        </div>
+        <div class="kpi-row" id="est-kpis"></div>
+        <div class="stock-overview-grid">
+          <article class="card stock-evolution-card">
+            <div class="chart-panel-header"><div><span class="chart-eyebrow">EVOLUÇÃO FINANCEIRA</span><h2>Evolução do valor do estoque</h2><p>Histórico do capital armazenado a cada movimentação registrada.</p></div></div>
+            <div class="stock-chart-wrap"><canvas id="chart-evolucao" title="Evolução do valor do estoque"></canvas></div>
+          </article>
+          <aside class="card stock-alerts-card">
+            <div class="card-header"><div><span class="chart-eyebrow">PONTOS DE ATENÇÃO</span><span class="card-title">Alertas importantes</span></div><span class="alert-count" id="est-alert-count">0</span></div>
+            <p class="card-description">Itens que precisam de acompanhamento ou reposição.</p>
+            <div id="est-alertas"></div>
+          </aside>
+        </div>
+        <div class="card stock-top-card mt16">
+          <div class="card-header">
+            <div><span class="chart-eyebrow">CONCENTRAÇÃO DE CAPITAL</span><span class="card-title">Top 5 produtos por valor em estoque</span></div>
+            <span class="card-helper">Participação sobre o valor total</span>
+          </div>
+          <div class="table-wrap">
+            <table class="tbl" id="est-top-tbl">
+              <thead><tr><th>#</th><th>Produto</th><th>Categoria</th><th>Valor em estoque</th><th>% do total</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- MOVIMENTAÇÕES -->
+      <section id="pg-movimentacoes" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Movimentações</h1>
+            <p class="pg-sub">Acompanhe entradas, saídas, ajustes e transferências</p>
+          </div>
+          <button class="btn-primary" onclick="abrirModalMovimentacao()">+ Nova movimentação</button>
+        </div>
+        <div class="kpi-row" id="mov-kpis"></div>
+        <div class="card">
+          <div class="tabs" id="mov-tabs">
+            <button class="tab active" onclick="filtrarMovTab('Todas',this)">Todas</button>
+            <button class="tab" onclick="filtrarMovTab('Entrada',this)">Entradas</button>
+            <button class="tab" onclick="filtrarMovTab('Saída',this)">Saídas</button>
+            <button class="tab" onclick="filtrarMovTab('Ajuste',this)">Ajustes</button>
+          </div>
+          <div class="table-wrap">
+            <table class="tbl" id="mov-tbl">
+              <thead><tr><th>Data</th><th>Tipo</th><th>Produto</th><th>Quantidade</th><th>Local</th><th>Responsável</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMPRAS -->
+      <section id="pg-compras" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Compras</h1>
+            <p class="pg-sub">Planeje e acompanhe suas compras de forma inteligente</p>
+          </div>
+          <button class="btn-primary" onclick="abrirModalCompra()">+ Novo pedido</button>
+        </div>
+        <div class="kpi-row" id="comp-kpis"></div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">Itens que precisam de reposição</span></div>
+          <div class="table-wrap">
+            <table class="tbl" id="comp-tbl">
+              <thead><tr><th>Item</th><th>Estoque atual</th><th>Mínimo</th><th>Necessidade</th><th>Valor est.</th><th>Criticidade</th><th>Ação</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORNECEDORES -->
+      <section id="pg-fornecedores" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Fornecedores</h1>
+            <p class="pg-sub">Gerencie e avalie seus fornecedores</p>
+          </div>
+          <button class="btn-primary" onclick="abrirModalFornecedor()">+ Novo fornecedor</button>
+        </div>
+        <div class="kpi-row" id="forn-kpis"></div>
+        <div class="card">
+          <div class="filters-bar">
+            <div class="input-icon search-filter">
+              <span><i data-lucide="search"></i></span>
+              <input type="text" id="forn-search" placeholder="Buscar fornecedor..." oninput="filtrarFornecedores()" maxlength="100">
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="tbl" id="forn-tbl">
+              <thead><tr><th>Fornecedor</th><th>Categoria</th><th>Avaliação</th><th>Entregas no prazo</th><th>Última compra</th><th>Situação</th><th>Ações</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- RELATÓRIOS -->
+      <section id="pg-relatorios" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Relatórios</h1>
+            <p class="pg-sub">Gere, visualize e exporte relatórios para uma gestão mais eficiente</p>
+          </div>
+        </div>
+        <div class="reports-workspace">
+          <div class="reports-main-column">
+            <div class="card report-selector-card">
+              <div class="card-header"><span class="card-title">Escolha o tipo de relatório</span><span class="card-helper">Clique para selecionar</span></div>
+              <div class="relatorio-grid" id="relat-cards"></div>
+            </div>
+            <div class="card report-recent-card">
+              <div class="card-header"><span class="card-title">Relatórios recentes</span></div>
+              <div class="table-wrap">
+                <table class="tbl" id="relat-tbl">
+                  <thead><tr><th>Relatório</th><th>Gerado em</th><th>Formato</th></tr></thead>
+                  <tbody id="relat-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <aside class="card report-generator-card">
+            <div class="report-generator-heading"><span>Gerar relatório</span><small>Configure antes de baixar</small></div>
+            <div class="selected-report-preview"><span id="selected-report-icon" aria-hidden="true"><i data-lucide="package"></i></span><div><small>Relatório selecionado</small><strong id="selected-report-name">Posição de estoque</strong><p id="selected-report-description">Saldo, nível e valor dos produtos.</p></div></div>
+            <div class="form-group"><label>Período</label><select id="report-period"><option value="all">Todo o histórico</option><option value="30">Últimos 30 dias</option><option value="90">Últimos 90 dias</option></select></div>
+            <div class="form-group"><label>Formato</label><select id="report-format"><option value="csv">Planilha CSV</option></select></div>
+            <button class="btn-primary w100" onclick="gerarRelatorioSelecionado()"><i data-lucide="file-text"></i> Gerar relatório</button>
+            <p class="report-generator-note">O arquivo será gerado e protegido contra injeção de fórmulas.</p>
+          </aside>
+        </div>
+      </section>
+
+      <!-- AUTOMAÇÕES -->
+      <section id="pg-automacoes" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Automações</h1>
+            <p class="pg-sub">Configure alertas e relatórios automáticos por e-mail</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table class="tbl" id="auto-tbl">
+              <thead><tr><th>Status</th><th>Gatilho / Horário</th><th>Ação executada</th><th>E-mail de destino</th><th>Ações</th></tr></thead>
+              <tbody id="auto-tbody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top: 16px;">
+            <button class="btn-primary sm" onclick="abrirModalAutomacao()">+ Nova automação</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- CONFIGURAÇÕES -->
+      <section id="pg-configuracoes" class="pg">
+        <div class="pg-header">
+          <div>
+            <h1>Configurações</h1>
+            <p class="pg-sub">Gerencie usuários, categorias, segurança e parâmetros do sistema</p>
+          </div>
+        </div>
+        <div class="config-grid">
+          <div class="card">
+            <div class="card-header"><span class="card-title">Usuários</span>
+              <button class="btn-primary sm" onclick="abrirModalUsuario()">+ Novo</button>
+            </div>
+            <div class="table-wrap">
+              <table class="tbl" id="user-tbl">
+                <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Ações</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">Categorias</span>
+              <button class="btn-primary sm" onclick="abrirModalCategoria()">+ Nova</button>
+            </div>
+            <div id="cat-list"></div>
+          </div>
+        </div>
+        <div id="audit-logs-container"></div>
+      </section>
+
+    </div><!-- /pages-container -->
+  </main>
+</div><!-- /app -->
+
+<!-- ========== MODALS ========== -->
+<div id="modal-overlay" class="modal-overlay hidden" onclick="fecharModal()">
+  <div class="modal" onclick="event.stopPropagation()" id="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-title">Modal</h3>
+      <button class="btn-close" onclick="fecharModal()" aria-label="Fechar"><i data-lucide="x"></i></button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+<script src="enhancements.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Logs and temp files
+*.log
+*.tmp
+test-out.txt
+test-dom.txt
+test-security.html
+
+# OS Files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
