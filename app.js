@@ -593,14 +593,20 @@ function renderProducts() {
           return `<tr>
             <td><strong>${esc(p.id)}</strong></td>
             <td><strong>${esc(p.nome)}</strong><br><small>${esc(p.desc || 'Sem descrição')}</small></td>
-            <td>${esc(p.categoria)}</td>
+            <td><span class="category-pill">${esc(p.categoria)}</span></td>
             <td>${esc(p.unidade)}</td>
-            <td><strong>${Number(p.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
+            <td>
+              <div class="quick-stock-ctrl">
+                <button type="button" class="btn-quick-step btn-minus" title="Baixa rápida (-1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', -1, event)">-1</button>
+                <strong class="stock-value ${slug(status(p))}">${Number(p.estoqueAtual).toLocaleString('pt-BR')}</strong>
+                <button type="button" class="btn-quick-step btn-plus" title="Entrada rápida (+1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', 1, event)">+1</button>
+              </div>
+            </td>
             <td>${Number(p.estoqueMin).toLocaleString('pt-BR')}</td>
             <td>${Number(p.estoqueMax).toLocaleString('pt-BR')}</td>
             <td>${badge(status(p))}</td>
             <td>
-              <button class="btn-icon" title="Editar" onclick="editarProduto('${safeId}')"><i data-lucide="edit-2"></i></button>
+              <button class="btn-icon" title="Editar" onclick="editarProduto('${safeId}')"><i data-lucide="pencil"></i></button>
               ${isAdmin ? `<button class="btn-icon" title="Excluir" onclick="excluirProduto('${safeId}')"><i data-lucide="trash-2"></i></button>` : ''}
             </td>
           </tr>`;

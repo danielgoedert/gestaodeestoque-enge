@@ -481,10 +481,16 @@ renderProducts = function () {
           <td><strong>${esc(product.id)}</strong></td>
           <td><button class="product-cell product-name-btn" onclick="abrirDetalhesProduto('${safeId}')"><img src="${productImage(product)}" alt=""><span><strong>${esc(product.nome)}</strong><small>${esc(product.desc || 'Sem descrição')}</small></span></button></td>
           <td><span class="category-pill">${esc(product.categoria)}</span></td><td>${esc(product.unidade)}</td>
-          <td><strong class="stock-value ${slug(epStatus(product))}">${Number(product.estoqueAtual).toLocaleString('pt-BR')}</strong></td>
+          <td>
+            <div class="quick-stock-ctrl">
+              <button type="button" class="btn-quick-step btn-minus" title="Baixa rápida (-1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', -1, event)">-1</button>
+              <strong class="stock-value ${slug(epStatus(product))}">${Number(product.estoqueAtual).toLocaleString('pt-BR')}</strong>
+              <button type="button" class="btn-quick-step btn-plus" title="Entrada rápida (+1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', 1, event)">+1</button>
+            </div>
+          </td>
           <td>${Number(product.estoqueMin).toLocaleString('pt-BR')}</td><td>${Number(product.estoqueMax).toLocaleString('pt-BR')}</td>
           <td>${badge(epStatus(product))}</td>
-          <td><div class="row-actions"><button class="btn-icon" title="Ver produto" onclick="abrirDetalhesProduto('${safeId}')"><i data-lucide="eye"></i></button><button class="btn-icon" title="Editar" onclick="editarProduto('${safeId}')"><i data-lucide="edit-2"></i></button>${isAdmin ? `<button class="btn-icon" title="Excluir" onclick="excluirProduto('${safeId}')"><i data-lucide="trash-2"></i></button>` : ''}</div></td>
+          <td><div class="row-actions"><button class="btn-icon" title="Ver produto" onclick="abrirDetalhesProduto('${safeId}')"><i data-lucide="eye"></i></button><button class="btn-icon" title="Editar" onclick="editarProduto('${safeId}')"><i data-lucide="pencil"></i></button>${isAdmin ? `<button class="btn-icon" title="Excluir" onclick="excluirProduto('${safeId}')"><i data-lucide="trash-2"></i></button>` : ''}</div></td>
         </tr>`;
       }).join('')
     : '<tr><td colspan="9" class="empty-state">Nenhum produto encontrado com estes filtros.</td></tr>';
@@ -1712,6 +1718,491 @@ function downloadCsvReport(filename, content) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+function movimentacaoRapidaProduto(productId, delta, event) {
+  event?.stopPropagation();
+  if (!Security.can('create_movement')) {
+    return toast('Acesso negado: permissão insuficiente para movimentar estoque.', 'error');
+  }
+  const safeId = Security.sanitizeId(productId);
+  const allProducts = products();
+  const product = allProducts.find(p => p.id === safeId);
+  if (!product) return toast('Produto não encontrado.', 'error');
+
+  const currentStock = Number(product.estoqueAtual) || 0;
+  const newStock = Math.max(0, currentStock + delta);
+
+  if (delta < 0 && currentStock <= 0) {
+    return toast(`Estoque de "${product.nome}" já está zerado.`, 'warning');
+  }
+
+  product.estoqueAtual = newStock;
+  DB.set('produtos', allProducts);
+
+  const movs = DB.get('movimentacoes') || [];
+  movs.unshift({
+    id: Date.now(),
+    data: new Date().toISOString(),
+    tipo: delta > 0 ? 'Entrada' : 'Saída',
+    produtoId: product.id,
+    produto: product.nome,
+    quantidade: delta > 0 ? 1 : -1,
+    saldoApos: newStock,
+    local: product.local || 'Balcão / Rápido',
+    responsavel: state.user?.nome || 'Operador',
+    descricao: delta > 0 ? 'Entrada rápida de balcão (+1 un)' : 'Baixa rápida de balcão (-1 un)'
+  });
+  DB.set('movimentacoes', movs);
+
+  Security.logAudit(delta > 0 ? 'MOVIMENTACAO_ENTRADA_RAPIDA' : 'MOVIMENTACAO_SAIDA_RAPIDA', `Movimentação rápida (${delta > 0 ? '+1' : '-1'}) no produto ${product.id} - ${product.nome}. Saldo: ${newStock}.`);
+
+  renderProducts();
+  if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
+  toast(`${delta > 0 ? '+1' : '-1'} ${product.unidade}: ${product.nome} (Novo saldo: ${newStock})`, delta > 0 ? 'success' : 'info');
+}
+
+// ===== IMPORTAÇÃO DE XML DE NOTA FISCAL (NF-e) =====
+function abrirModalImportarNFe() {
+  if (!Security.can('create_movement')) {
+    return toast('Acesso negado: permissão insuficiente para importar NF-e.', 'error');
+  }
+  state.pendingNFe = null;
+
+  modal('Importar XML de Nota Fiscal (NF-e)', `
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 28px 20px; text-align: center; background: #f8fafc; cursor: pointer;" onclick="$('nfe-file-input').click()">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: #e0f2fe; color: #0284c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px;"><i data-lucide="file-code-2"></i></div>
+        <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a;">Selecione ou arraste o arquivo XML da NF-e</h4>
+        <p style="margin: 0; font-size: 12px; color: #64748b;">Suporta arquivos de Nota Fiscal Eletrônica no formato padrão SEFAZ (.xml)</p>
+        <input type="file" id="nfe-file-input" accept=".xml,text/xml" style="display: none;" onchange="processarArquivoNFe(this)">
+      </div>
+      <div id="nfe-preview-container"></div>
+    </div>
+  `);
+  $('modal-box').classList.add('modal-wide');
+  refreshInterfaceIcons();
+}
+
+function processarArquivoNFe(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const text = e.target.result;
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, 'text/xml');
+
+      if (xml.querySelector('parsererror')) {
+        return toast('Arquivo XML inválido ou corrompido.', 'error');
+      }
+
+      // Extração de dados da NF-e
+      const nNF = xml.querySelector('ide > nNF, nNF')?.textContent || 'S/N';
+      const serie = xml.querySelector('ide > serie, serie')?.textContent || '1';
+      const dhEmi = xml.querySelector('ide > dhEmi, ide > dEmi, dhEmi, dEmi')?.textContent || new Date().toISOString();
+      const emitNome = xml.querySelector('emit > xNome, emit xNome')?.textContent || 'Fornecedor Desconhecido';
+      let emitCnpj = xml.querySelector('emit > CNPJ, emit CNPJ, emit > CPF, emit CPF')?.textContent || '';
+      if (emitCnpj.length === 14) {
+        emitCnpj = emitCnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+      }
+
+      const detNodes = Array.from(xml.querySelectorAll('det'));
+      if (!detNodes.length) {
+        return toast('Nenhum item/produto encontrado dentro do XML da NF-e.', 'error');
+      }
+
+      const allProducts = products();
+      const items = detNodes.map((det, idx) => {
+        const cProd = det.querySelector('prod > cProd, cProd')?.textContent?.trim() || '';
+        const xProd = det.querySelector('prod > xProd, xProd')?.textContent?.trim() || '';
+        const NCM = det.querySelector('prod > NCM, NCM')?.textContent?.trim() || '';
+        const uCom = (det.querySelector('prod > uCom, uCom')?.textContent?.trim() || 'UN').toUpperCase();
+        const qCom = parseFloat(det.querySelector('prod > qCom, qCom')?.textContent || '0') || 1;
+        const vUnCom = parseFloat(det.querySelector('prod > vUnCom, vUnCom')?.textContent || '0') || 0;
+        const vProd = parseFloat(det.querySelector('prod > vProd, vProd')?.textContent || '0') || (qCom * vUnCom);
+
+        // Matching com produtos existentes
+        const matched = allProducts.find(p =>
+          p.id.toLowerCase() === cProd.toLowerCase() ||
+          p.nome.toLowerCase() === xProd.toLowerCase() ||
+          p.nome.toLowerCase().includes(xProd.toLowerCase()) ||
+          xProd.toLowerCase().includes(p.nome.toLowerCase())
+        );
+
+        return {
+          idx,
+          cProd,
+          xProd,
+          NCM,
+          uCom,
+          qCom,
+          vUnCom,
+          vProd,
+          matchedProductId: matched ? matched.id : null,
+          action: matched ? 'update' : 'create'
+        };
+      });
+
+      const totalNF = items.reduce((sum, item) => sum + item.vProd, 0);
+
+      state.pendingNFe = {
+        nNF,
+        serie,
+        dhEmi,
+        emitNome,
+        emitCnpj,
+        totalNF,
+        items
+      };
+
+      renderNFePreview();
+    } catch (err) {
+      console.error(err);
+      toast('Erro ao processar o XML da NF-e: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function renderNFePreview() {
+  const container = $('nfe-preview-container');
+  if (!container || !state.pendingNFe) return;
+
+  const nfe = state.pendingNFe;
+  const allProducts = products();
+
+  container.innerHTML = `
+    <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+      <dl class="nfe-header-card">
+        <div><dt>Fornecedor / Emitente</dt><dd>${esc(nfe.emitNome)}</dd></div>
+        <div><dt>CNPJ</dt><dd>${esc(nfe.emitCnpj || 'Não informado')}</dd></div>
+        <div><dt>Nota Fiscal</dt><dd>Nº ${esc(nfe.nNF)} (Série ${esc(nfe.serie)})</dd></div>
+        <div><dt>Data de Emissão</dt><dd>${new Date(nfe.dhEmi).toLocaleDateString('pt-BR')}</dd></div>
+        <div><dt>Total dos Produtos</dt><dd><strong style="color: #16a34a;">${money(nfe.totalNF)}</strong></dd></div>
+      </dl>
+
+      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <strong style="font-size: 13px; color: #0f172a;">Itens Identificados no XML (${nfe.items.length})</strong>
+        <span class="card-helper">Verifique os vínculos com o estoque</span>
+      </div>
+
+      <div class="table-wrap" style="max-height: 260px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px;">
+        <table class="tbl" style="margin: 0;">
+          <thead>
+            <tr>
+              <th>Cód. NF</th><th>Descrição do Produto</th><th>Qtd.</th><th>Unid.</th><th>Valor Unit.</th><th>Subtotal</th><th>Destino no Estoque</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${nfe.items.map(item => `
+              <tr>
+                <td><small>${esc(item.cProd)}</small></td>
+                <td><strong>${esc(item.xProd)}</strong><br><small style="color: var(--text2);">NCM: ${esc(item.NCM || '—')}</small></td>
+                <td><strong>+${item.qCom}</strong></td>
+                <td><small>${esc(item.uCom)}</small></td>
+                <td>${money(item.vUnCom)}</td>
+                <td><strong>${money(item.vProd)}</strong></td>
+                <td>
+                  <select onchange="atualizarVinculoItemNFe(${item.idx}, this.value)" style="padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 11px; max-width: 200px;">
+                    <option value="__NEW__" ${!item.matchedProductId ? 'selected' : ''}>+ Cadastrar como novo produto</option>
+                    ${allProducts.map(p => `<option value="${esc(p.id)}" ${item.matchedProductId === p.id ? 'selected' : ''}>Vincular: ${esc(p.id)} - ${esc(p.nome)}</option>`).join('')}
+                  </select>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px; background: #f8fafc; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border);">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+          <input type="checkbox" id="nfe-recalc-cost" checked>
+          <span><strong>Cálculo de Custo Médio Ponderado:</strong> Atualizar o custo unitário dos produtos vinculados com base na média ponderada da entrada.</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+          <input type="checkbox" id="nfe-register-supplier" checked>
+          <span><strong>Cadastrar/Atualizar Fornecedor:</strong> Registrar ${esc(nfe.emitNome)} no catálogo de fornecedores com o histórico desta compra.</span>
+        </label>
+      </div>
+
+      <div class="modal-footer" style="margin-top: 16px;">
+        <button type="button" class="btn-outline" onclick="fecharModal()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="confirmarImportacaoNFe()"><i data-lucide="check"></i> Confirmar Entrada de Estoque</button>
+      </div>
+    </div>
+  `;
+  refreshInterfaceIcons();
+}
+
+function atualizarVinculoItemNFe(itemIdx, value) {
+  if (!state.pendingNFe || !state.pendingNFe.items[itemIdx]) return;
+  state.pendingNFe.items[itemIdx].matchedProductId = value === '__NEW__' ? null : value;
+}
+
+function confirmarImportacaoNFe() {
+  if (!state.pendingNFe) return;
+  const nfe = state.pendingNFe;
+  const shouldRecalcCost = $('nfe-recalc-cost')?.checked !== false;
+  const shouldRegisterSupplier = $('nfe-register-supplier')?.checked !== false;
+
+  let allProducts = products();
+  const movs = DB.get('movimentacoes') || [];
+  let addedCount = 0;
+  let updatedCount = 0;
+
+  nfe.items.forEach(item => {
+    let product = item.matchedProductId ? allProducts.find(p => p.id === item.matchedProductId) : null;
+
+    if (product) {
+      // Atualiza produto existente
+      const oldStock = Number(product.estoqueAtual) || 0;
+      const oldCost = Number(product.custo) || 0;
+      const newStock = oldStock + item.qCom;
+
+      if (shouldRecalcCost) {
+        const newCost = newStock > 0 ? ((oldStock * oldCost) + (item.qCom * item.vUnCom)) / newStock : item.vUnCom;
+        product.custo = parseFloat(newCost.toFixed(2));
+      }
+
+      product.estoqueAtual = newStock;
+      if (!product.fornecedor) product.fornecedor = nfe.emitNome;
+
+      movs.unshift({
+        id: Date.now() + Math.random(),
+        data: nfe.dhEmi || new Date().toISOString(),
+        tipo: 'Entrada',
+        produtoId: product.id,
+        produto: product.nome,
+        quantidade: item.qCom,
+        saldoApos: newStock,
+        local: product.local || 'Estoque Central',
+        responsavel: state.user?.nome || 'Operador',
+        descricao: `Entrada via NF-e nº ${nfe.nNF} (${nfe.emitNome})`
+      });
+      updatedCount++;
+    } else {
+      // Cadastra novo produto
+      const newId = nextProductCode();
+      const newProduct = {
+        id: newId,
+        nome: item.xProd,
+        desc: `Importado via NF-e nº ${nfe.nNF} (NCM: ${item.NCM || '—'})`,
+        categoria: 'Geral',
+        unidade: item.uCom || 'UN',
+        estoqueAtual: item.qCom,
+        estoqueMin: Math.max(5, Math.ceil(item.qCom * 0.2)),
+        estoqueMax: Math.max(20, Math.ceil(item.qCom * 2)),
+        custo: item.vUnCom,
+        preco: parseFloat((item.vUnCom * 1.4).toFixed(2)),
+        local: 'Estoque Central',
+        fornecedor: nfe.emitNome,
+        ativo: true
+      };
+      allProducts.unshift(newProduct);
+
+      movs.unshift({
+        id: Date.now() + Math.random(),
+        data: nfe.dhEmi || new Date().toISOString(),
+        tipo: 'Entrada',
+        produtoId: newId,
+        produto: item.xProd,
+        quantidade: item.qCom,
+        saldoApos: item.qCom,
+        local: 'Estoque Central',
+        responsavel: state.user?.nome || 'Operador',
+        descricao: `Cadastro e entrada inicial via NF-e nº ${nfe.nNF} (${nfe.emitNome})`
+      });
+      addedCount++;
+    }
+  });
+
+  DB.set('produtos', allProducts);
+  DB.set('movimentacoes', movs);
+
+  // Cadastrar ou atualizar fornecedor
+  if (shouldRegisterSupplier && nfe.emitNome) {
+    const suppliers = DB.get('fornecedores') || [];
+    let sup = suppliers.find(s => (nfe.emitCnpj && s.cnpj === nfe.emitCnpj) || s.nome.toLowerCase() === nfe.emitNome.toLowerCase());
+    if (sup) {
+      sup.totalCompras = (Number(sup.totalCompras) || 0) + nfe.totalNF;
+      sup.ultimaCompra = nfe.dhEmi ? nfe.dhEmi.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    } else {
+      suppliers.unshift({
+        nome: nfe.emitNome,
+        cnpj: nfe.emitCnpj || '00.000.000/0000-00',
+        categoria: 'Geral',
+        avaliacao: 5.0,
+        entregasPrazo: 100,
+        qualidade: 100,
+        situacao: 'Aprovado',
+        totalCompras: nfe.totalNF,
+        ultimaCompra: nfe.dhEmi ? nfe.dhEmi.slice(0, 10) : new Date().toISOString().slice(0, 10)
+      });
+    }
+    DB.set('fornecedores', suppliers);
+  }
+
+  Security.logAudit('NFE_IMPORTADA', `NF-e nº ${nfe.nNF} (${nfe.emitNome}) processada com sucesso: ${updatedCount} produtos atualizados, ${addedCount} novos produtos cadastrados. Total: ${money(nfe.totalNF)}.`);
+
+  fecharModal();
+  renderProducts();
+  if (typeof renderRelatorios === 'function') renderRelatorios();
+  if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
+  toast(`NF-e nº ${nfe.nNF} importada com sucesso! (${nfe.items.length} itens processados)`, 'success');
+}
+
+// ===== BACKUP COMPLETO E RESTAURAÇÃO (JSON) =====
+function exportarBackupCompleto() {
+  if (!Security.can('view_settings')) {
+    return toast('Acesso negado: apenas administradores podem exportar backup.', 'error');
+  }
+
+  const payload = {
+    sistema: 'EngePro Gestao de Estoque',
+    versao: '2.5.0',
+    timestamp: new Date().toISOString(),
+    autor: state.user?.nome || 'Administrador',
+    contadores: {
+      produtos: DB.get('produtos')?.length || 0,
+      movimentacoes: DB.get('movimentacoes')?.length || 0,
+      pedidos: DB.get('pedidos')?.length || 0,
+      fornecedores: DB.get('fornecedores')?.length || 0,
+      usuarios: DB.get('usuarios')?.length || 0,
+      relatorios: DB.get('relatorios')?.length || 0,
+      automacoes: DB.get('automacoes')?.length || 0
+    },
+    bancoDeDados: {
+      produtos: DB.get('produtos') || [],
+      movimentacoes: DB.get('movimentacoes') || [],
+      pedidos: DB.get('pedidos') || [],
+      fornecedores: DB.get('fornecedores') || [],
+      usuarios: DB.get('usuarios') || [],
+      categorias: DB.get('categorias') || [],
+      relatorios: DB.get('relatorios') || [],
+      automacoes: DB.get('automacoes') || [],
+      audit_log: DB.get('audit_log') || []
+    }
+  };
+
+  const jsonStr = JSON.stringify(payload, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  link.href = url;
+  link.download = `backup-estoque-engepro-${dateStr}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  Security.logAudit('BACKUP_EXPORTADO', `Backup completo em JSON gerado com ${payload.contadores.produtos} produtos e ${payload.contadores.movimentacoes} movimentações.`);
+  toast('Backup completo exportado com sucesso! Guarde o arquivo com segurança.', 'success');
+}
+
+function abrirModalRestaurarBackup() {
+  if (!Security.can('view_settings')) {
+    return toast('Acesso negado: apenas administradores podem restaurar backup.', 'error');
+  }
+  state.pendingBackupData = null;
+
+  modal('Restaurar Backup do Banco de Dados (JSON)', `
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px 20px; text-align: center; background: #f8fafc; cursor: pointer;" onclick="$('backup-file-input').click()">
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: #fee2e2; color: #dc2626; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px;"><i data-lucide="database"></i></div>
+        <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a;">Selecione o arquivo de Backup (.json)</h4>
+        <p style="margin: 0; font-size: 12px; color: #64748b;">Carregue o arquivo JSON gerado anteriormente pelo sistema</p>
+        <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;" onchange="processarArquivoBackup(this)">
+      </div>
+      <div id="backup-restore-preview"></div>
+    </div>
+  `);
+  refreshInterfaceIcons();
+}
+
+function processarArquivoBackup(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.bancoDeDados || typeof data.bancoDeDados !== 'object') {
+        return toast('Arquivo de backup inválido: estrutura de dados não reconhecida.', 'error');
+      }
+
+      state.pendingBackupData = data;
+      const preview = $('backup-restore-preview');
+      if (preview) {
+        preview.innerHTML = `
+          <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 14px 16px; margin-top: 10px;">
+            <strong style="color: #991b1b; font-size: 13.5px;">⚠️ Atenção: A restauração substituirá os dados atuais!</strong>
+            <p style="color: #7f1d1d; font-size: 12px; margin: 4px 0 10px;">Recomendamos baixar uma cópia do seu estado atual antes de prosseguir.</p>
+            <ul style="font-size: 12px; color: #334155; margin: 0; padding-left: 18px; line-height: 1.6;">
+              <li><strong>Data do Backup:</strong> ${data.timestamp ? new Date(data.timestamp).toLocaleString('pt-BR') : 'Data não informada'}</li>
+              <li><strong>Autor:</strong> ${esc(data.autor || 'Administrador')}</li>
+              <li><strong>Produtos a restaurar:</strong> ${data.bancoDeDados.produtos?.length || 0}</li>
+              <li><strong>Movimentações a restaurar:</strong> ${data.bancoDeDados.movimentacoes?.length || 0}</li>
+              <li><strong>Fornecedores a restaurar:</strong> ${data.bancoDeDados.fornecedores?.length || 0}</li>
+              <li><strong>Usuários a restaurar:</strong> ${data.bancoDeDados.usuarios?.length || 0}</li>
+            </ul>
+          </div>
+          <div class="modal-footer" style="margin-top: 16px;">
+            <button type="button" class="btn-outline" onclick="fecharModal()">Cancelar</button>
+            <button type="button" class="btn-danger" onclick="confirmarRestauracaoBackup()"><i data-lucide="rotate-ccw"></i> Confirmar Restauração</button>
+          </div>
+        `;
+        refreshInterfaceIcons();
+      }
+    } catch (err) {
+      toast('Erro ao ler arquivo JSON: ' + err.message, 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function confirmarRestauracaoBackup() {
+  if (!state.pendingBackupData || !state.pendingBackupData.bancoDeDados) return;
+  const db = state.pendingBackupData.bancoDeDados;
+
+  Object.entries(db).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      DB.set(key, value);
+    }
+  });
+
+  Security.logAudit('BACKUP_RESTAURADO', `Restauração completa efetuada a partir do backup de ${state.pendingBackupData.timestamp || 'data desconhecida'}.`);
+
+  fecharModal();
+  toast('Banco de dados restaurado com sucesso!', 'success');
+  setTimeout(() => location.reload(), 1200);
+}
+
+function renderConfiguracoesBackupStats() {
+  const container = $('backup-counts-summary');
+  if (!container) return;
+  const pCount = DB.get('produtos')?.length || 0;
+  const mCount = DB.get('movimentacoes')?.length || 0;
+  const fCount = DB.get('fornecedores')?.length || 0;
+  const uCount = DB.get('usuarios')?.length || 0;
+
+  container.innerHTML = `
+    <span><strong>${pCount}</strong> produtos</span>
+    <span><strong>${mCount}</strong> movimentações</span>
+    <span><strong>${fCount}</strong> fornecedores</span>
+    <span><strong>${uCount}</strong> usuários</span>
+  `;
+}
+
+// Hook de estatísticas de backup em renderConfiguracoes
+const originalRenderConfiguracoes = typeof renderConfiguracoes === 'function' ? renderConfiguracoes : null;
+renderConfiguracoes = function () {
+  if (originalRenderConfiguracoes) originalRenderConfiguracoes();
+  renderConfiguracoesBackupStats();
+};
+
 function refreshInterfaceIcons() {
   if (!window.lucide?.createIcons) return;
   window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
@@ -1740,3 +2231,4 @@ renderPage = function (page) {
 };
 
 document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(refreshInterfaceIcons));
+

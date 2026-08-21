@@ -545,6 +545,67 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .stock-value { color: #16a34a; }
 .stock-value.atencao { color: #d97706; }
 .stock-value.critico, .stock-value.sem-estoque { color: #dc2626; }
+
+/* Controles de Movimentação Rápida de Balcão (+1 / -1) */
+.quick-stock-ctrl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-quick-step {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.btn-quick-step:hover {
+  transform: scale(1.1);
+}
+.btn-quick-step.btn-minus:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fca5a5;
+}
+.btn-quick-step.btn-plus:hover {
+  background: #dcfce7;
+  color: #16a34a;
+  border-color: #86efac;
+}
+
+/* NF-e Modal & Cards */
+.nfe-header-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+.nfe-header-card dt {
+  font-size: 11px;
+  color: var(--text2);
+  margin-bottom: 2px;
+}
+.nfe-header-card dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
 .row-actions { display: flex; align-items: center; gap: 1px; }
 .row-actions .btn-icon { font-size: 13px; }
 .pagination { justify-content: space-between; }
