@@ -2226,11 +2226,14 @@ function renderConfiguracoesBackupStats() {
   `;
 }
 
-// Hook de estatísticas de backup em renderConfiguracoes
+// Hook de estatísticas de backup e detecção de IP em renderConfiguracoes
 const originalRenderConfiguracoes = typeof renderConfiguracoes === 'function' ? renderConfiguracoes : null;
 renderConfiguracoes = function () {
   if (originalRenderConfiguracoes) originalRenderConfiguracoes();
   renderConfiguracoesBackupStats();
+  if (typeof detectClientIp === 'function') detectClientIp();
+  if (typeof updateIpDisplay === 'function') updateIpDisplay();
+  if (typeof refreshInterfaceIcons === 'function') refreshInterfaceIcons();
 };
 
 function refreshInterfaceIcons() {

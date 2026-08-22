@@ -551,6 +551,32 @@
               <button type="button" class="btn-primary" onclick="abrirModalRestaurarBackup()"><i data-lucide="upload"></i> Restaurar Backup</button>
             </div>
           </div>
+
+          <!-- SESSÃO ATIVA & IP DO DISPOSITIVO -->
+          <div class="session-ip-card" id="session-ip-card" style="margin-top: 14px; padding: 14px 16px; background: #ffffff; border: 1px solid var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="width: 40px; height: 40px; border-radius: 10px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center;"><i data-lucide="shield-check"></i></div>
+              <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <strong style="font-size: 13.5px; color: #0f172a;">Sessão Ativa & Dispositivo Conectado</strong>
+                  <span class="badge normal" style="font-size: 10px;">Conexão Segura</span>
+                </div>
+                <p style="font-size: 11.5px; color: #64748b; margin: 2px 0 0;" id="session-ip-desc">Identificação em tempo real do endereço IP e dispositivo acessando esta conta.</p>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+              <div style="text-align: right;">
+                <small style="display: block; font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">Seu Endereço IP</small>
+                <strong style="font-size: 14px; color: #0f172a; font-family: monospace;" id="live-client-ip">Detectando IP...</strong>
+              </div>
+              <div style="text-align: right;">
+                <small style="display: block; font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600;">Dispositivo & Sistema</small>
+                <strong style="font-size: 12.5px; color: #334155;" id="live-client-device">Detectando...</strong>
+              </div>
+              <button type="button" class="btn-outline sm" onclick="detectClientIp(true)" title="Recarregar IP"><i data-lucide="refresh-cw"></i></button>
+            </div>
+          </div>
+
           <div class="backup-info-panel" id="backup-info-panel" style="margin-top: 14px; padding: 14px 16px; background: #f8fafc; border: 1px solid var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <div style="width: 38px; height: 38px; border-radius: 9px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center;"><i data-lucide="database"></i></div>

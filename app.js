@@ -9,8 +9,65 @@ const state = {
   editingUserId: null,
   editingSupplierId: null,
   activeAutomacaoId: null,
-  searchQuery: ''
+  searchQuery: '',
+  clientIp: '127.0.0.1',
+  clientDevice: detectDevice()
 };
+
+function detectDevice() {
+  if (typeof navigator === 'undefined') return 'Navegador Web';
+  const ua = navigator.userAgent;
+  let os = 'Windows';
+  if (/Android/i.test(ua)) os = 'Android';
+  else if (/iPhone|iPad|iPod/i.test(ua)) os = 'iOS (Apple)';
+  else if (/Mac/i.test(ua)) os = 'macOS';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+
+  let browser = 'Chrome';
+  if (/Edg/i.test(ua)) browser = 'Edge';
+  else if (/Firefox/i.test(ua)) browser = 'Firefox';
+  else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+
+  const isMobile = /Mobile|Android|iPhone|iPad/i.test(ua);
+  return `${os} • ${browser} (${isMobile ? 'Mobile' : 'Desktop'})`;
+}
+
+async function detectClientIp(force = false) {
+  if (state.clientIp && state.clientIp !== '127.0.0.1' && !force) {
+    updateIpDisplay();
+    return state.clientIp;
+  }
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', { cache: 'no-store' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.ip) {
+        state.clientIp = data.ip;
+      }
+    }
+  } catch {
+    try {
+      const res2 = await fetch('https://ipapi.co/json/');
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2 && data2.ip) {
+          state.clientIp = data2.ip;
+        }
+      }
+    } catch {
+      state.clientIp = '127.0.0.1 (Rede Local)';
+    }
+  }
+  updateIpDisplay();
+  return state.clientIp;
+}
+
+function updateIpDisplay() {
+  const ipEl = $('live-client-ip');
+  if (ipEl) ipEl.textContent = state.clientIp || '127.0.0.1';
+  const devEl = $('live-client-device');
+  if (devEl) devEl.textContent = state.clientDevice || 'Navegador Web';
+}
 
 // Atalho DOM seguro
 const $ = id => document.getElementById(id);
@@ -57,6 +114,7 @@ function refreshIcons() {
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
   DB.init();
+  detectClientIp();
 
   // 1. Preenche e-mail lembrado neste dispositivo se houver
   const rememberedEmail = localStorage.getItem('ep_remembered_email');
@@ -1463,13 +1521,13 @@ function renderAuditLogs() {
       <div class="card-header">
         <div>
           <span class="card-title">Trilha de Auditoria e Segurança</span>
-          <p class="card-helper">Registro de eventos operacionais, autenticações e proteção SQL</p>
+          <p class="card-helper">Registro de eventos operacionais, autenticações, endereços IP e proteção SQL</p>
         </div>
         <button class="btn-outline sm" onclick="exportarLogsAuditoria()"><i data-lucide="download"></i> Exportar Logs</button>
       </div>
       <div class="table-wrap">
         <table class="tbl" id="audit-tbl">
-          <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Perfil</th><th>Ação</th><th>Status</th><th>Detalhes</th></tr></thead>
+          <thead><tr><th>Data/Hora</th><th>Usuário</th><th>Perfil</th><th>Ação</th><th>Status</th><th>IP / Dispositivo</th><th>Detalhes</th></tr></thead>
           <tbody>
             ${logs.length ? logs.map(l => {
               const st = auditStatusMap[l.status] || { label: l.status, badge: 'normal' };
@@ -1481,10 +1539,14 @@ function renderAuditLogs() {
                   <td><span class="badge ${l.actorPerfil === 'Administrador' ? 'normal' : 'ajuste'}">${esc(l.actorPerfil)}</span></td>
                   <td><strong>${esc(actName)}</strong><br><small style="color: var(--text2); font-size: 10.5px;">${esc(l.action)}</small></td>
                   <td><span class="badge ${st.badge}">${esc(st.label)}</span></td>
+                  <td>
+                    <span class="badge normal" style="font-family: monospace; font-size: 11px; padding: 2px 7px;">${esc(l.ip || '127.0.0.1')}</span>
+                    <br><small style="color: var(--text2); font-size: 10.5px;">${esc(l.device || 'Navegador')}</small>
+                  </td>
                   <td><small>${esc(l.details)}</small></td>
                 </tr>
               `;
-            }).join('') : '<tr><td colspan="6" class="empty-state">Nenhum registro de auditoria no momento.</td></tr>'}
+            }).join('') : '<tr><td colspan="7" class="empty-state">Nenhum registro de auditoria no momento.</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -1495,7 +1557,7 @@ function renderAuditLogs() {
 
 function exportarLogsAuditoria() {
   const logs = DB.get('audit_log') || [];
-  const headers = ['ID', 'Data/Hora', 'Usuário', 'E-mail', 'Perfil', 'Ação', 'Status', 'Detalhes', 'User-Agent'];
+  const headers = ['ID', 'Data/Hora', 'Usuário', 'E-mail', 'Perfil', 'Ação', 'Status', 'Endereço IP', 'Dispositivo', 'Detalhes', 'User-Agent'];
   const rows = logs.map(l => {
     const st = auditStatusMap[l.status]?.label || l.status;
     const act = auditActionMap[l.action] || l.action;
@@ -1507,6 +1569,8 @@ function exportarLogsAuditoria() {
       Security.sanitizeCsvCell(l.actorPerfil),
       Security.sanitizeCsvCell(`${act} (${l.action})`),
       Security.sanitizeCsvCell(st),
+      Security.sanitizeCsvCell(l.ip || '127.0.0.1'),
+      Security.sanitizeCsvCell(l.device || 'Navegador'),
       Security.sanitizeCsvCell(l.details),
       Security.sanitizeCsvCell(l.userAgent)
     ];

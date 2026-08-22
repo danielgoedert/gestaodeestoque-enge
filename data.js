@@ -307,6 +307,8 @@ const Security = {
     try {
       const logs = DB.get('audit_log') || [];
       const actor = customUser || (typeof state !== 'undefined' ? state.user : null) || { nome: 'Anônimo/Sistema', email: 'sistema' };
+      const currentIp = (typeof state !== 'undefined' && state.clientIp) ? state.clientIp : '127.0.0.1';
+      const currentDev = (typeof state !== 'undefined' && state.clientDevice) ? state.clientDevice : 'Navegador Web';
       const entry = {
         id: Date.now() + Math.random().toString(36).slice(2, 6),
         timestamp: new Date().toISOString(),
@@ -316,6 +318,8 @@ const Security = {
         action: action,
         details: typeof details === 'object' ? JSON.stringify(details) : String(details),
         status: status,
+        ip: currentIp,
+        device: currentDev,
         userAgent: (typeof navigator !== 'undefined' ? navigator.userAgent : 'Desconhecido').slice(0, 80)
       };
       logs.unshift(entry);
