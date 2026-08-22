@@ -1769,11 +1769,16 @@ function abrirModalImportarNFe() {
 
   modal('Importar XML de Nota Fiscal (NF-e)', `
     <div style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 28px 20px; text-align: center; background: #f8fafc; cursor: pointer;" onclick="$('nfe-file-input').click()">
-        <div style="width: 48px; height: 48px; border-radius: 12px; background: #e0f2fe; color: #0284c7; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px;"><i data-lucide="file-code-2"></i></div>
-        <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a;">Selecione ou arraste o arquivo XML da NF-e</h4>
-        <p style="margin: 0; font-size: 12px; color: #64748b;">Suporta arquivos de Nota Fiscal Eletrônica no formato padrão SEFAZ (.xml)</p>
-        <input type="file" id="nfe-file-input" accept=".xml,text/xml" style="display: none;" onchange="processarArquivoNFe(this)">
+      <div id="nfe-dropzone" class="dropzone-box"
+           ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over');"
+           ondragenter="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over');"
+           ondragleave="event.preventDefault(); event.stopPropagation(); this.classList.remove('drag-over');"
+           ondrop="event.preventDefault(); event.stopPropagation(); this.classList.remove('drag-over'); handleNFeDrop(event);"
+           onclick="$('nfe-file-input').click()">
+        <div class="dropzone-icon"><i data-lucide="file-code-2"></i></div>
+        <h4 class="dropzone-title">Arraste e solte o arquivo XML da NF-e aqui</h4>
+        <p class="dropzone-sub">ou clique em qualquer lugar para selecionar o arquivo (.xml)</p>
+        <input type="file" id="nfe-file-input" accept=".xml,text/xml" style="display: none;" onchange="processarArquivoNFe(this.files[0])">
       </div>
       <div id="nfe-preview-container"></div>
     </div>
@@ -1782,8 +1787,18 @@ function abrirModalImportarNFe() {
   refreshInterfaceIcons();
 }
 
-function processarArquivoNFe(input) {
-  const file = input?.files?.[0];
+function handleNFeDrop(event) {
+  const dt = event.dataTransfer;
+  const file = dt?.files?.[0];
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.xml') && file.type !== 'text/xml') {
+    return toast('Por favor, envie um arquivo de Nota Fiscal com extensão .xml válido.', 'warning');
+  }
+  processarArquivoNFe(file);
+}
+
+function processarArquivoNFe(inputOrFile) {
+  const file = (inputOrFile instanceof File) ? inputOrFile : inputOrFile?.files?.[0];
   if (!file) return;
 
   const reader = new FileReader();
@@ -2109,11 +2124,16 @@ function abrirModalRestaurarBackup() {
 
   modal('Restaurar Backup do Banco de Dados (JSON)', `
     <div style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 24px 20px; text-align: center; background: #f8fafc; cursor: pointer;" onclick="$('backup-file-input').click()">
-        <div style="width: 48px; height: 48px; border-radius: 12px; background: #fee2e2; color: #dc2626; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px;"><i data-lucide="database"></i></div>
-        <h4 style="margin: 0 0 4px; font-size: 14px; font-weight: 700; color: #0f172a;">Selecione o arquivo de Backup (.json)</h4>
-        <p style="margin: 0; font-size: 12px; color: #64748b;">Carregue o arquivo JSON gerado anteriormente pelo sistema</p>
-        <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;" onchange="processarArquivoBackup(this)">
+      <div id="backup-dropzone" class="dropzone-box"
+           ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over');"
+           ondragenter="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over');"
+           ondragleave="event.preventDefault(); event.stopPropagation(); this.classList.remove('drag-over');"
+           ondrop="event.preventDefault(); event.stopPropagation(); this.classList.remove('drag-over'); handleBackupDrop(event);"
+           onclick="$('backup-file-input').click()">
+        <div class="dropzone-icon" style="background: #fee2e2; color: #dc2626;"><i data-lucide="database"></i></div>
+        <h4 class="dropzone-title">Arraste e solte o arquivo de Backup (.json) aqui</h4>
+        <p class="dropzone-sub">ou clique em qualquer lugar para selecionar o arquivo (.json)</p>
+        <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;" onchange="processarArquivoBackup(this.files[0])">
       </div>
       <div id="backup-restore-preview"></div>
     </div>
@@ -2121,8 +2141,18 @@ function abrirModalRestaurarBackup() {
   refreshInterfaceIcons();
 }
 
-function processarArquivoBackup(input) {
-  const file = input?.files?.[0];
+function handleBackupDrop(event) {
+  const dt = event.dataTransfer;
+  const file = dt?.files?.[0];
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.json') && file.type !== 'application/json') {
+    return toast('Por favor, envie um arquivo de Backup com extensão .json válido.', 'warning');
+  }
+  processarArquivoBackup(file);
+}
+
+function processarArquivoBackup(inputOrFile) {
+  const file = (inputOrFile instanceof File) ? inputOrFile : inputOrFile?.files?.[0];
   if (!file) return;
 
   const reader = new FileReader();

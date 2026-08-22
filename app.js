@@ -829,47 +829,64 @@ function abrirModalImportarProdutos() {
   ];
 
   modal('Importar Produtos (Planilha Excel / CSV)', `
-    <div class="import-toolbar">
-      <div>
-        <strong>Planilha Padrão para Importação</strong>
-        <p style="font-size: 11.5px; color: var(--text2); margin-top: 2px;">Baixe o modelo ou faça upload de um arquivo CSV / Excel formatado.</p>
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      <div id="planilha-dropzone" class="dropzone-box"
+           ondragover="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over');"
+           ondragenter="event.preventDefault(); event.stopPropagation(); this.classList.add('drag-over');"
+           ondragleave="event.preventDefault(); event.stopPropagation(); this.classList.remove('drag-over');"
+           ondrop="event.preventDefault(); event.stopPropagation(); this.classList.remove('drag-over'); handlePlanilhaDrop(event);"
+           onclick="$('planilha-file-input').click()">
+        <div class="dropzone-icon"><i data-lucide="upload"></i></div>
+        <h4 class="dropzone-title">Arraste e solte sua planilha Excel ou CSV aqui</h4>
+        <p class="dropzone-sub">ou clique em qualquer lugar para selecionar o arquivo (.csv, .xlsx, .xls, .txt)</p>
+        <input type="file" id="planilha-file-input" accept=".csv,.txt,.xlsx,.xls" onchange="processarArquivoPlanilha(this.files[0])" style="display: none;">
       </div>
-      <div class="import-buttons">
-        <button type="button" class="btn-outline sm" onclick="baixarPlanilhaModelo()"><i data-lucide="download"></i> Baixar Modelo (.csv)</button>
-        <label class="btn-primary sm" style="cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-          <i data-lucide="file-up"></i> Selecionar Arquivo
-          <input type="file" accept=".csv,.txt,.xlsx,.xls" onchange="processarArquivoPlanilha(this)" style="display: none;">
-        </label>
-        <button type="button" class="btn-outline sm" onclick="carregarPlanilhaExemplo()"><i data-lucide="refresh-cw"></i> Restaurar Padrão</button>
+
+      <div class="import-toolbar" style="margin-top: 0;">
+        <div>
+          <strong>Planilha Padrão para Importação</strong>
+          <p style="font-size: 11.5px; color: var(--text2); margin-top: 2px;">Baixe o modelo preenchível ou restaure o exemplo inicial.</p>
+        </div>
+        <div class="import-buttons">
+          <button type="button" class="btn-outline sm" onclick="baixarPlanilhaModelo()"><i data-lucide="download"></i> Baixar Modelo (.csv)</button>
+          <button type="button" class="btn-outline sm" onclick="carregarPlanilhaExemplo()"><i data-lucide="refresh-cw"></i> Restaurar Exemplo Padrão</button>
+        </div>
       </div>
-    </div>
 
-    <div class="import-summary-bar">
-      <span>Pré-visualização dos itens a serem importados (<strong id="import-count">${window._planilhaImportacaoTemp.length}</strong> itens)</span>
-      <span style="font-size: 11px; color: #16a34a;"><i data-lucide="shield-check" style="width: 13px; height: 13px; vertical-align: middle;"></i> Dados higienizados contra injeções SQL</span>
-    </div>
+      <div class="import-summary-bar">
+        <span>Pré-visualização dos itens a serem importados (<strong id="import-count">${window._planilhaImportacaoTemp.length}</strong> itens)</span>
+        <span style="font-size: 11px; color: #16a34a;"><i data-lucide="shield-check" style="width: 13px; height: 13px; vertical-align: middle;"></i> Dados higienizados contra injeções SQL</span>
+      </div>
 
-    <div class="import-preview-wrap">
-      <table id="import-preview-tbl">
-        <thead>
-          <tr>
-            <th>Código</th><th>Produto</th><th>Descrição</th><th>Categoria</th><th>Unid.</th><th>Est. Atual</th><th>Est. Mín.</th><th>Est. Máx.</th><th>Custo (R$)</th><th>Fornecedor</th><th>Local</th>
-          </tr>
-        </thead>
-        <tbody id="import-preview-tbody">
-          ${renderTabelaImportacao()}
-        </tbody>
-      </table>
-    </div>
+      <div class="import-preview-wrap">
+        <table id="import-preview-tbl">
+          <thead>
+            <tr>
+              <th>Código</th><th>Produto</th><th>Descrição</th><th>Categoria</th><th>Unid.</th><th>Est. Atual</th><th>Est. Mín.</th><th>Est. Máx.</th><th>Custo (R$)</th><th>Fornecedor</th><th>Local</th>
+            </tr>
+          </thead>
+          <tbody id="import-preview-tbody">
+            ${renderTabelaImportacao()}
+          </tbody>
+        </table>
+      </div>
 
-    <div class="modal-footer">
-      <button type="button" class="btn-outline" onclick="fecharModal()">Cancelar</button>
-      <button type="button" class="btn-primary" onclick="executarImportacaoProdutos()"><i data-lucide="check"></i> Confirmar Importação</button>
+      <div class="modal-footer" style="margin-top: 16px;">
+        <button type="button" class="btn-outline" onclick="fecharModal()">Cancelar</button>
+        <button type="button" class="btn-primary" onclick="executarImportacaoProdutos()"><i data-lucide="upload"></i> Confirmar Importação (<span id="btn-import-count">${window._planilhaImportacaoTemp.length}</span> produtos)</button>
+      </div>
     </div>
   `);
 
   $('modal-box').classList.add('modal-wide');
   refreshIcons();
+}
+
+function handlePlanilhaDrop(event) {
+  const dt = event.dataTransfer;
+  const file = dt?.files?.[0];
+  if (!file) return;
+  processarArquivoPlanilha(file);
 }
 
 function renderTabelaImportacao() {
@@ -919,8 +936,8 @@ function baixarPlanilhaModelo() {
   toast('Planilha modelo baixada com sucesso.', 'success');
 }
 
-function processarArquivoPlanilha(input) {
-  const file = input.files?.[0];
+function processarArquivoPlanilha(inputOrFile) {
+  const file = (inputOrFile instanceof File) ? inputOrFile : inputOrFile?.files?.[0];
   if (!file) return;
 
   const reader = new FileReader();
