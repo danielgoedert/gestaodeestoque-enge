@@ -182,6 +182,36 @@ async function doLogin(event) {
     return;
   }
 
+  // 3. Autenticação via Supabase Cloud (se configurado)
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    try {
+      const userSession = await window.SupabaseBridge.login(email, senha);
+      if (userSession) {
+        Security.resetRateLimit();
+        const rememberChecked = $('remember')?.checked;
+        if (rememberChecked) {
+          localStorage.setItem('ep_user', JSON.stringify(userSession));
+          localStorage.setItem('ep_remembered_email', email);
+          sessionStorage.removeItem('ep_user');
+        } else {
+          sessionStorage.setItem('ep_user', JSON.stringify(userSession));
+          localStorage.removeItem('ep_user');
+        }
+        Security.logAudit('LOGIN_SUCESSO', `Login via Supabase Cloud: ${userSession.nome} (${userSession.empresaNome}).`, 'SUCCESS', userSession);
+        loginSuccess(userSession);
+        toast(`Bem-vindo, ${userSession.nome}!`, 'success');
+        return;
+      }
+    } catch (sbErr) {
+      console.warn('Erro na autenticação Supabase:', sbErr);
+      Security.recordFailedLogin();
+      Security.logAudit('LOGIN_FALHOU', `Falha de autenticação no Supabase para ${email}: ${sbErr.message}`, 'FAILURE');
+      toast(sbErr.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos no Supabase.' : (sbErr.message || 'Erro ao autenticar.'), 'error');
+      return;
+    }
+  }
+
+  // 4. Autenticação Local / Fallback
   const u = DB.getUser(email);
 
   if (!u || !u.ativo) {
@@ -191,7 +221,6 @@ async function doLogin(event) {
     return;
   }
 
-  // 3. Verificação de Senha Criptográfica
   let isValid = false;
   if (u.salt && u.passwordHash) {
     const computedHash = await Security.hashPassword(senha, u.salt);
@@ -203,7 +232,6 @@ async function doLogin(event) {
   if (isValid) {
     Security.resetRateLimit();
 
-    // Criação de sessão segura sem exposição de credenciais ou hashes
     const safeUserSession = {
       id: u.id,
       nome: u.nome,
@@ -224,7 +252,7 @@ async function doLogin(event) {
       localStorage.removeItem('ep_remembered_email');
     }
 
-    Security.logAudit('LOGIN_SUCESSO', `Usuário ${u.nome} (${u.email}) logado com sucesso. Perfil: ${u.perfil}`, 'SUCCESS', safeUserSession);
+    Security.logAudit('LOGIN_SUCESSO', `Login realizado pelo usuário ${u.nome} (${u.perfil}).`, 'SUCCESS', safeUserSession);
     loginSuccess(safeUserSession);
     toast(`Bem-vindo, ${u.nome}!`, 'success');
   } else {
@@ -263,6 +291,9 @@ function loginSuccess(u) {
 }
 
 function doLogout() {
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    window.SupabaseBridge.logout();
+  }
   Security.logAudit('LOGOUT', `Usuário ${state.user?.nome || 'Anônimo'} encerrou a sessão.`, 'SUCCESS');
   localStorage.removeItem('ep_user');
   sessionStorage.removeItem('ep_user');
