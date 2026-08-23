@@ -1,10 +1,9 @@
 // ===== SUPABASECLIENT.JS - Ponte de Conexão e Sincronização Cloud =====
 
 // 1. CONFIGURAÇÃO DAS SUAS CHAVES DO SUPABASE
-// Obtenha estas chaves em: https://supabase.com > Seu Projeto > Project Settings > API
 const SUPABASE_CONFIG = {
-  url: '', // Exemplo: 'https://xyzcompany.supabase.co'
-  anonKey: '' // Exemplo: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+  url: 'https://syhrzkhtlhgjkfxqaqpx.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5aHJ6a2h0bGhnamtmeHFhcXB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MjM5MDcsImV4cCI6MjEwMzA5OTkwN30.ymiRtgzoqcpN_X6gC_lZBlVawjiRCYfpK9U7rLUDr4A'
 };
 
 const SupabaseBridge = {
