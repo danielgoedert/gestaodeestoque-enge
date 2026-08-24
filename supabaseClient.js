@@ -1,85 +1,83 @@
-// ===== SUPABASECLIENT.JS - Ponte de Conexão e Sincronização Cloud =====
+// ===== SUPABASECLIENT.JS - Ponte Direta e Conexão Nativa com Supabase Cloud =====
 
-// 1. CONFIGURAÇÃO DAS SUAS CHAVES DO SUPABASE
 const SUPABASE_CONFIG = {
   url: 'https://syhrzkhtlhgjkfxqaqpx.supabase.co',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN5aHJ6a2h0bGhnamtmeHFhcXB4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MjM5MDcsImV4cCI6MjEwMzA5OTkwN30.ymiRtgzoqcpN_X6gC_lZBlVawjiRCYfpK9U7rLUDr4A'
 };
 
 const SupabaseBridge = {
-  client: null,
+  token: null,
   currentUser: null,
   currentPerfil: null,
 
-  // Verifica se o Supabase foi configurado pelo usuário
   isConfigured() {
     return Boolean(
       SUPABASE_CONFIG.url &&
       SUPABASE_CONFIG.anonKey &&
-      !SUPABASE_CONFIG.url.includes('SEU_PROJETO') &&
-      typeof window !== 'undefined' &&
-      window.supabase &&
-      window.supabase.createClient
+      !SUPABASE_CONFIG.url.includes('SEU_PROJETO')
     );
   },
 
-  // Inicializa a conexão
+  getHeaders(useAuth = true) {
+    const headers = {
+      'apikey': SUPABASE_CONFIG.anonKey,
+      'Content-Type': 'application/json'
+    };
+    const t = this.token || localStorage.getItem('ep_sb_token') || sessionStorage.getItem('ep_sb_token');
+    if (useAuth && t) {
+      headers['Authorization'] = `Bearer ${t}`;
+    }
+    return headers;
+  },
+
   init() {
-    if (!this.isConfigured()) {
-      console.info('ℹ️ Supabase não configurado. Operando em modo de dados local.');
-      return null;
+    const savedToken = localStorage.getItem('ep_sb_token') || sessionStorage.getItem('ep_sb_token');
+    if (savedToken) {
+      this.token = savedToken;
     }
-    try {
-      this.client = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
-      console.log('✅ Supabase conectado com sucesso!');
-      this.setupRealtimeListeners();
-      return this.client;
-    } catch (err) {
-      console.warn('⚠️ Erro ao inicializar o Supabase:', err);
-      return null;
-    }
+    console.log('✅ Supabase Bridge nativo inicializado!');
+    return this;
   },
 
-  // Escuta alterações em tempo real (Realtime)
-  setupRealtimeListeners() {
-    if (!this.client) return;
-    try {
-      this.client
-        .channel('public:schema-changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'produtos' }, () => {
-          if (typeof renderProducts === 'function') renderProducts();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'movimentacoes' }, () => {
-          if (typeof renderMovimentacoes === 'function') renderMovimentacoes();
-        })
-        .subscribe();
-    } catch (e) {
-      console.warn('Realtime listener indisponível:', e);
-    }
-  },
-
-  // ===== AUTENTICAÇÃO =====
+  // ===== AUTENTICAÇÃO DIRETA =====
   async login(email, password) {
-    if (!this.client) this.init();
-    if (!this.client) throw new Error('Não foi possível conectar ao Supabase.');
+    if (!this.isConfigured()) throw new Error('Supabase não configurado.');
 
-    const { data, error } = await this.client.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const endpoint = `${SUPABASE_CONFIG.url}/auth/v1/token?grant_type=password`;
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_CONFIG.anonKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email, password })
+    });
 
-    // Busca o perfil e empresa do usuário logado
+    const data = await res.json();
+    if (!res.ok) {
+      const errorMsg = data.error_description || data.msg || data.message || 'Falha ao autenticar no Supabase.';
+      throw new Error(errorMsg);
+    }
+
+    this.token = data.access_token;
+    localStorage.setItem('ep_sb_token', data.access_token);
+    sessionStorage.setItem('ep_sb_token', data.access_token);
+    this.currentUser = data.user;
+
+    // Busca o perfil da empresa
     let perfil = null;
     try {
-      const { data: pData } = await this.client
-        .from('perfis')
-        .select('*, empresas(*)')
-        .eq('id', data.user.id)
-        .maybeSingle();
-      perfil = pData;
-    } catch (e) {
-      console.warn('Perfil pendente:', e);
+      const pRes = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/perfis?select=*,empresas(*)&id=eq.${data.user.id}`, {
+        headers: this.getHeaders(true)
+      });
+      if (pRes.ok) {
+        const pList = await pRes.json();
+        if (pList && pList.length > 0) perfil = pList[0];
+      }
+    } catch (err) {
+      console.warn('Perfil query warning:', err);
     }
 
-    this.currentUser = data.user;
     this.currentPerfil = perfil;
 
     return {
@@ -87,51 +85,54 @@ const SupabaseBridge = {
       email: data.user.email,
       nome: perfil?.nome || data.user.email.split('@')[0],
       perfil: perfil?.perfil || 'Administrador',
-      empresaId: perfil?.empresa_id,
+      empresaId: perfil?.empresa_id || '11111111-1111-1111-1111-111111111111',
       empresaNome: perfil?.empresas?.nome || 'EngePro Gestão de Estoque',
       avatar: perfil?.avatar || 'AD'
     };
   },
 
   async logout() {
-    if (this.client) {
-      await this.client.auth.signOut();
-    }
+    this.token = null;
     this.currentUser = null;
     this.currentPerfil = null;
+    localStorage.removeItem('ep_sb_token');
+    sessionStorage.removeItem('ep_sb_token');
   },
 
   // ===== PRODUTOS =====
   async getProdutos() {
-    if (!this.client) return null;
-    const { data, error } = await this.client
-      .from('produtos')
-      .select('*')
-      .order('nome', { ascending: true });
-    if (error) {
-      console.error('Erro ao buscar produtos:', error);
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/produtos?select=*&order=nome.asc`, {
+        headers: this.getHeaders(true)
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.map(p => ({
+        id: p.id,
+        nome: p.nome,
+        desc: p.descricao,
+        categoria: p.categoria,
+        unidade: p.unidade,
+        estoqueAtual: Number(p.estoque_atual),
+        estoqueMin: Number(p.estoque_min),
+        estoqueMax: Number(p.estoque_max),
+        custo: Number(p.custo),
+        fornecedor: p.fornecedor,
+        local: p.localizacao
+      }));
+    } catch (e) {
+      console.warn('Erro ao buscar produtos do Supabase:', e);
       return null;
     }
-    return data.map(p => ({
-      id: p.id,
-      nome: p.nome,
-      desc: p.descricao,
-      categoria: p.categoria,
-      unidade: p.unidade,
-      estoqueAtual: Number(p.estoque_atual),
-      estoqueMin: Number(p.estoque_min),
-      estoqueMax: Number(p.estoque_max),
-      custo: Number(p.custo),
-      fornecedor: p.fornecedor,
-      local: p.localizacao
-    }));
   },
 
   async saveProduto(prod) {
-    if (!this.client || !this.currentPerfil?.empresa_id) return null;
+    if (!this.isConfigured()) return null;
+    const empresaId = this.currentPerfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
     const payload = {
       id: prod.id,
-      empresa_id: this.currentPerfil.empresa_id,
+      empresa_id: empresaId,
       nome: prod.nome,
       descricao: prod.desc || '',
       categoria: prod.categoria || 'Outros',
@@ -144,44 +145,66 @@ const SupabaseBridge = {
       localizacao: prod.local || '',
       updated_at: new Date().toISOString()
     };
-    const { data, error } = await this.client.from('produtos').upsert(payload);
-    if (error) throw error;
-    return data;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/produtos`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(true),
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      console.warn('Erro ao salvar produto no Supabase:', e);
+      return false;
+    }
   },
 
   async deleteProduto(id) {
-    if (!this.client) return null;
-    const { error } = await this.client.from('produtos').delete().eq('id', id);
-    if (error) throw error;
-    return true;
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/produtos?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(true)
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
   },
 
   // ===== MOVIMENTAÇÕES =====
   async getMovimentacoes() {
-    if (!this.client) return null;
-    const { data, error } = await this.client
-      .from('movimentacoes')
-      .select('*')
-      .order('data', { ascending: false });
-    if (error) return null;
-    return data.map(m => ({
-      id: m.id,
-      data: m.data,
-      tipo: m.tipo,
-      produtoId: m.produto_id,
-      produto: m.produto_nome,
-      quantidade: Number(m.quantidade),
-      saldoApos: Number(m.saldo_apos),
-      local: m.local,
-      responsavel: m.responsavel,
-      descricao: m.descricao
-    }));
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/movimentacoes?select=*&order=data.desc`, {
+        headers: this.getHeaders(true)
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.map(m => ({
+        id: m.id,
+        data: m.data,
+        tipo: m.tipo,
+        produtoId: m.produto_id,
+        produto: m.produto_nome,
+        quantidade: Number(m.quantidade),
+        saldoApos: Number(m.saldo_apos),
+        local: m.local,
+        responsavel: m.responsavel,
+        descricao: m.descricao
+      }));
+    } catch (e) {
+      return null;
+    }
   },
 
   async addMovimentacao(mov) {
-    if (!this.client || !this.currentPerfil?.empresa_id) return null;
+    if (!this.isConfigured()) return null;
+    const empresaId = this.currentPerfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
     const payload = {
-      empresa_id: this.currentPerfil.empresa_id,
+      empresa_id: empresaId,
       produto_id: mov.produtoId || mov.produto,
       produto_nome: mov.produto,
       tipo: mov.tipo,
@@ -192,38 +215,50 @@ const SupabaseBridge = {
       descricao: mov.descricao || '',
       data: mov.data || new Date().toISOString()
     };
-    const { data, error } = await this.client.from('movimentacoes').insert(payload);
-    if (error) throw error;
-    return data;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/movimentacoes`, {
+        method: 'POST',
+        headers: this.getHeaders(true),
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
   },
 
   // ===== FORNECEDORES =====
   async getFornecedores() {
-    if (!this.client) return null;
-    const { data, error } = await this.client
-      .from('fornecedores')
-      .select('*')
-      .order('nome', { ascending: true });
-    if (error) return null;
-    return data.map(f => ({
-      id: f.id,
-      nome: f.nome,
-      cnpj: f.cnpj,
-      contato: f.contato,
-      email: f.email,
-      telefone: f.telefone,
-      totalComprado: Number(f.total_comprado || 0),
-      avaliacao: Number(f.avaliacao || 5),
-      entregasPrazo: Number(f.entregas_prazo || 100),
-      qualidade: Number(f.qualidade || 100),
-      situacao: f.situacao || 'Aprovado'
-    }));
+    if (!this.isConfigured()) return null;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/fornecedores?select=*&order=nome.asc`, {
+        headers: this.getHeaders(true)
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.map(f => ({
+        id: f.id,
+        nome: f.nome,
+        cnpj: f.cnpj,
+        contato: f.contato,
+        email: f.email,
+        telefone: f.telefone,
+        totalComprado: Number(f.total_comprado || 0),
+        avaliacao: Number(f.avaliacao || 5),
+        entregasPrazo: Number(f.entregas_prazo || 100),
+        qualidade: Number(f.qualidade || 100),
+        situacao: f.situacao || 'Aprovado'
+      }));
+    } catch (e) {
+      return null;
+    }
   },
 
   async saveFornecedor(forn) {
-    if (!this.client || !this.currentPerfil?.empresa_id) return null;
+    if (!this.isConfigured()) return null;
+    const empresaId = this.currentPerfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
     const payload = {
-      empresa_id: this.currentPerfil.empresa_id,
+      empresa_id: empresaId,
       nome: forn.nome,
       cnpj: forn.cnpj || '',
       contato: forn.contato || '',
@@ -235,9 +270,19 @@ const SupabaseBridge = {
       situacao: forn.situacao || 'Aprovado'
     };
     if (forn.id && forn.id.length > 20) payload.id = forn.id;
-    const { data, error } = await this.client.from('fornecedores').upsert(payload);
-    if (error) throw error;
-    return data;
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/fornecedores`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(true),
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
   }
 };
 
