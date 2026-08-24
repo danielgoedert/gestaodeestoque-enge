@@ -494,36 +494,74 @@ function fecharNotif() {
   $('notif-dropdown')?.classList.remove('open');
 }
 
-function renderNotificacoes() {
+function getNotifsStorageKey() {
+  const empId = state.user?.empresaId || state.user?.email || 'global';
+  return `ep_notifs_read_${empId}`;
+}
+
+function getReadNotifKeys() {
+  try {
+    const raw = localStorage.getItem(getNotifsStorageKey());
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setReadNotifKeys(keys) {
+  try {
+    localStorage.setItem(getNotifsStorageKey(), JSON.stringify(keys));
+  } catch {}
+}
+
+function getActiveStockAlerts() {
   const ps = products();
-  const alerts = ps.filter(p => status(p) !== 'Normal');
+  return ps.filter(p => status(p) !== 'Normal').map(p => {
+    const st = status(p);
+    const alertKey = `${p.id}_${st}_${p.estoqueAtual}`;
+    return {
+      key: alertKey,
+      produtoId: p.id,
+      nome: p.nome,
+      status: st,
+      estoqueAtual: p.estoqueAtual,
+      estoqueMin: p.estoqueMin,
+      unidade: p.unidade,
+      isDanger: (st === 'Sem estoque' || st === 'Crítico')
+    };
+  });
+}
+
+function renderNotificacoes() {
+  const allAlerts = getActiveStockAlerts();
+  const readKeys = getReadNotifKeys();
   const list = $('notif-list');
   if (!list) return;
 
-  if (!alerts.length) {
+  if (!allAlerts.length) {
     list.innerHTML = `
-      <div style="padding: 24px 16px; text-align: center; color: var(--text2); font-size: 13px;">
-        <i data-lucide="circle-check" style="width: 32px; height: 32px; color: #16a34a; margin-bottom: 8px; display: inline-block;"></i>
-        <p>Todos os itens estão com nível de estoque normal!</p>
+      <div style="padding: 28px 16px; text-align: center; color: var(--text2); font-size: 13px;">
+        <i data-lucide="shield-check" style="width: 36px; height: 36px; color: #16a34a; margin-bottom: 8px; display: inline-block;"></i>
+        <strong style="display: block; color: var(--text); font-size: 13.5px; margin-bottom: 2px;">Estoque 100% em Dia</strong>
+        <p style="margin: 0; font-size: 12px;">Todos os produtos cadastrados estão com nível de estoque normal.</p>
       </div>
     `;
     refreshIcons();
     return;
   }
 
-  list.innerHTML = alerts.map(p => {
-    const st = status(p);
-    const isDanger = st === 'Sem estoque' || st === 'Crítico';
-    const safeId = Security.sanitizeId(p.id);
+  list.innerHTML = allAlerts.map(a => {
+    const isRead = readKeys.includes(a.key);
+    const safeId = Security.sanitizeId(a.produtoId);
     return `
-      <div class="notif-item" onclick="abrirDetalhesProduto('${safeId}');fecharNotif()">
-        <div class="notif-item-icon ${isDanger ? 'danger' : 'warning'}">
-          <i data-lucide="${isDanger ? 'triangle-alert' : 'clock-3'}"></i>
+      <div class="notif-item ${isRead ? 'notif-read' : ''}" style="${isRead ? 'opacity: 0.65; background: #f8fafc;' : ''}" onclick="abrirDetalhesProduto('${safeId}');fecharNotif()">
+        <div class="notif-item-icon ${a.isDanger ? 'danger' : 'warning'}">
+          <i data-lucide="${a.isDanger ? 'triangle-alert' : 'clock-3'}"></i>
         </div>
         <div class="notif-item-content">
-          <div class="notif-item-title">${esc(p.nome)}</div>
-          <div class="notif-item-desc">${esc(st)}: Saldo atual ${Number(p.estoqueAtual)} ${esc(p.unidade)} (mínimo ${Number(p.estoqueMin)}).</div>
-          <div class="notif-item-time">Ação requerida na reposição</div>
+          <div class="notif-item-title">${esc(a.nome)} ${isRead ? '<span style="font-size: 10px; color: var(--text2); font-weight: 500;">(visto)</span>' : ''}</div>
+          <div class="notif-item-desc">${esc(a.status)}: Saldo atual ${Number(a.estoqueAtual)} ${esc(a.unidade)} (mínimo ${Number(a.estoqueMin)}).</div>
+          <div class="notif-item-time">${a.isDanger ? 'Reposição urgente recomendada' : 'Atenção ao ponto de pedido'}</div>
         </div>
       </div>
     `;
@@ -533,10 +571,12 @@ function renderNotificacoes() {
 
 function limparNotificacoes(e) {
   if (e) e.stopPropagation();
-  const notif = $('notif-badge');
-  if (notif) notif.style.display = 'none';
-  toast('Notificações marcadas como visualizadas.');
-  fecharNotif();
+  const allAlerts = getActiveStockAlerts();
+  const allKeys = allAlerts.map(a => a.key);
+  setReadNotifKeys(allKeys);
+  updateNotificacoes();
+  renderNotificacoes();
+  toast('Todas as notificações foram marcadas como lidas!', 'success');
 }
 
 document.addEventListener('click', e => {
@@ -603,11 +643,15 @@ function renderPage(page) {
 }
 
 function updateNotificacoes() {
-  const alertas = products().filter(p => status(p) !== 'Normal').length;
+  const allAlerts = getActiveStockAlerts();
+  const readKeys = getReadNotifKeys();
+  const unreadAlerts = allAlerts.filter(a => !readKeys.includes(a.key));
+  const unreadCount = unreadAlerts.length;
+  
   const notif = $('notif-badge');
   if (notif) {
-    notif.textContent = alertas > 0 ? String(alertas) : '0';
-    notif.style.display = alertas > 0 ? 'flex' : 'none';
+    notif.textContent = unreadCount > 0 ? String(unreadCount) : '0';
+    notif.style.display = unreadCount > 0 ? 'flex' : 'none';
   }
 }
 
