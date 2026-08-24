@@ -297,6 +297,29 @@ function loginSuccess(u) {
   navigate('dashboard');
   updateNotificacoes();
   refreshIcons();
+
+  syncSupabaseCloudData();
+}
+
+async function syncSupabaseCloudData() {
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    try {
+      const [prods, movs, forns] = await Promise.all([
+        window.SupabaseBridge.getProdutos(),
+        window.SupabaseBridge.getMovimentacoes(),
+        window.SupabaseBridge.getFornecedores()
+      ]);
+      if (prods && prods.length) DB.set('produtos', prods);
+      if (movs && movs.length) DB.set('movimentacoes', movs);
+      if (forns && forns.length) DB.set('fornecedores', forns);
+      renderProducts();
+      renderMovimentacoes();
+      renderFornecedores();
+      renderDashboard();
+    } catch (e) {
+      console.warn('Erro ao sincronizar dados da nuvem Supabase:', e);
+    }
+  }
 }
 
 function doLogout() {
@@ -873,6 +896,9 @@ function salvarProduto(e) {
   }
 
   DB.set('produtos', ps);
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    window.SupabaseBridge.saveProduto(prod).catch(err => console.warn('Sync Supabase error:', err));
+  }
   fecharModal();
   renderProducts();
   updateNotificacoes();
@@ -894,6 +920,9 @@ function excluirProduto(id) {
   if (confirm(`Tem certeza que deseja excluir o produto "${p.nome}" (${safeId})?`)) {
     const ps = products().filter(x => x.id !== safeId);
     DB.set('produtos', ps);
+    if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+      window.SupabaseBridge.deleteProduto(safeId).catch(err => console.warn('Sync Supabase error:', err));
+    }
     Security.logAudit('PRODUTO_EXCLUIDO', `Produto ${safeId} (${p.nome}) excluído.`);
     renderProducts();
     updateNotificacoes();
