@@ -370,7 +370,17 @@ const DB = {
       ]);
     }
 
-    // 3. Inicialização de Produtos
+    // 3. Em modo Supabase Cloud: NÃO injeta dados mock/demo para manter cada empresa 100% limpa e isolada
+    const isCloud = (typeof window !== 'undefined' && window.SupabaseBridge && window.SupabaseBridge.isConfigured());
+    if (isCloud) {
+      if (!localStorage.getItem('ep_produtos')) this.set('produtos', []);
+      if (!localStorage.getItem('ep_movimentacoes')) this.set('movimentacoes', []);
+      if (!localStorage.getItem('ep_fornecedores')) this.set('fornecedores', []);
+      if (!localStorage.getItem('ep_pedidos')) this.set('pedidos', []);
+      return;
+    }
+
+    // 3. Inicialização de Produtos (Modo Demo Local apenas)
     if (!localStorage.getItem('ep_produtos')) {
       this.set('produtos', [
         { id: 'MP-0001', nome: 'Tubo de Aço 1"', desc: 'Tubo redondo de aço carbono', categoria: 'Matéria-prima', unidade: 'm', estoqueAtual: 1290, estoqueMin: 500, estoqueMax: 2000, custo: 21.00, fornecedor: 'Metalúrgica São José', local: 'Almoxarifado 01', ativo: true },

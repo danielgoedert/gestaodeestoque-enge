@@ -329,6 +329,10 @@ function doLogout() {
   Security.logAudit('LOGOUT', `Usuário ${state.user?.nome || 'Anônimo'} encerrou a sessão.`, 'SUCCESS');
   localStorage.removeItem('ep_user');
   sessionStorage.removeItem('ep_user');
+  localStorage.removeItem('ep_produtos');
+  localStorage.removeItem('ep_movimentacoes');
+  localStorage.removeItem('ep_fornecedores');
+  localStorage.removeItem('ep_pedidos');
   state.user = null;
   $('app').classList.add('hidden');
   $('page-login').classList.add('active');
