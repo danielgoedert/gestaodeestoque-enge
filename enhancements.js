@@ -1,5 +1,7 @@
 /* Melhorias operacionais e visuais alinhadas às telas de referência. */
 
+const slug = str => String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 function epStatus(product) {
   const current = Number(product.estoqueAtual) || 0;
   const minimum = Number(product.estoqueMin) || 0;
@@ -21,8 +23,8 @@ function productFallback(product) {
     'Material de Consumo': ['#fef3c7', '#b45309', 'MC'],
     'EPI': ['#ffedd5', '#c2410c', 'EP']
   };
-  const [background, foreground, initials] = palette[product.categoria] || ['#e2e8f0', '#475569', 'PR'];
-  const safeInitials = Security.esc(initials).slice(0, 2);
+  const [background, foreground, initials] = palette[product?.categoria] || ['#e2e8f0', '#475569', 'PR'];
+  const safeInitials = Security.esc(initials || 'PR').slice(0, 2);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><rect width="120" height="120" rx="22" fill="${background}"/><path d="M34 42h52v40H34z" fill="none" stroke="${foreground}" stroke-width="5"/><path d="M34 42l26-14 26 14M60 28v54" fill="none" stroke="${foreground}" stroke-width="5" stroke-linejoin="round"/><text x="60" y="104" text-anchor="middle" font-family="Arial" font-size="15" font-weight="700" fill="${foreground}">${safeInitials}</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
