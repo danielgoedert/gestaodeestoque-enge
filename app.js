@@ -985,7 +985,9 @@ function excluirProduto(id) {
     }
     Security.logAudit('PRODUTO_EXCLUIDO', `Produto ${safeId} (${p.nome}) excluído.`);
     renderProducts();
+    renderDashboard();
     updateNotificacoes();
+    refreshIcons();
     toast('Produto excluído com sucesso.');
   }
 }

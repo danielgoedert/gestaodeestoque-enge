@@ -660,10 +660,13 @@ function salvarProdutoCompleto(event, originalId) {
   if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
     window.SupabaseBridge.saveProduto(saved).catch(err => console.warn('Supabase sync error:', err));
   }
-  Security.logAudit(originalId ? 'PRODUTO_ATUALIZADO' : 'PRODUTO_CRIADO', `Produto ${saved.id} (${saved.nome}) salvo.`);
   fecharModal();
   state.productPage = 1;
   renderProducts();
+  renderDashboard();
+  updateNotificacoes();
+  if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
+  refreshInterfaceIcons();
   toast(originalId ? 'Produto atualizado com sucesso.' : 'Produto cadastrado com sucesso.', 'success');
 }
 
@@ -763,9 +766,19 @@ function salvarMovimentacaoCompleta(event) {
   });
   DB.set('produtos', allProducts);
   DB.set('movimentacoes', movements);
+
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    window.SupabaseBridge.saveProduto(product).catch(err => console.warn('Supabase sync error:', err));
+    if (movements[0]) window.SupabaseBridge.addMovimentacao(movements[0]).catch(err => console.warn('Supabase sync error:', err));
+  }
+
   Security.logAudit('MOVIMENTACAO_REGISTRADA', `${values.tipo} de ${Math.abs(delta)} un no produto ${product.id} (${product.nome}). Saldo: ${newBalance}.`);
   fecharModal();
-  renderPage(state.page);
+  renderDashboard();
+  if (state.page && typeof renderPage === 'function') renderPage(state.page);
+  updateNotificacoes();
+  if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
+  refreshInterfaceIcons();
   toast('Movimentação registrada e estoque atualizado.', 'success');
 }
 
