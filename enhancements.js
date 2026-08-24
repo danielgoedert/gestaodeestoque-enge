@@ -202,7 +202,7 @@ function renderPerformanceIndicators(allProducts, movements, replenishmentCount,
     { name: 'Taxa de ocupação', value: occupancy, score: occupancyHealthScore(occupancy), context: `${occupiedCapacity.toLocaleString('pt-BR')} de ${totalCapacity.toLocaleString('pt-BR')} un. utilizadas`, ranges: ['Crítico', 'Atenção', 'Regular', 'Ótimo'] },
     { name: 'Giro de estoque', value: turnover, context: 'Em relação à meta do período', ranges: ['Crítico', 'Atenção', 'Regular', 'Ótimo'] },
     { name: 'Acuracidade de inventário', value: inventoryAccuracy, context: 'Conferência sistema x físico', ranges: ['Crítico', 'Atenção', 'Regular', 'Ótimo'] },
-    { name: 'Fill rate', value: fillRate, context: 'Pedidos completos e no prazo', ranges: ['Crítico', 'Atenção', 'Regular', 'Ótimo'] },
+    { name: 'Taxa de atendimento', value: fillRate, context: 'Pedidos atendidos no prazo (Fill Rate)', ranges: ['Crítico', 'Atenção', 'Regular', 'Ótimo'] },
     { name: 'Espaço ocioso', value: idleSpace, score: 100 - idleSpace, context: idleSpace <= 25 ? 'Faixa eficiente' : idleSpace <= 45 ? 'Acompanhar uso' : 'Subutilização do armazém', ranges: ['Crítico', 'Atenção', 'Regular', 'Ótimo'] }
   ];
   const gaugeContainer = $('dash-performance-gauges');
@@ -461,10 +461,13 @@ renderProducts = function () {
     const searchable = [product.id, product.nome, product.desc, product.categoria, product.local, product.fornecedor].join(' ').toLowerCase();
     return (!query || searchable.includes(query)) && (!category || product.categoria === category) && (!selectedStatus || epStatus(product) === selectedStatus) && (!location || product.local === location) && (!supplier || product.fornecedor === supplier);
   });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / state.productPageSize));
-  state.productPage = Math.min(state.productPage, totalPages);
-  const start = (state.productPage - 1) * state.productPageSize;
-  const rows = filtered.slice(start, start + state.productPageSize);
+  const pageSize = Number(state.productPageSize) || 10;
+  const currentPage = Number(state.productPage) || 1;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  state.productPage = Math.min(Math.max(1, currentPage), totalPages);
+  state.productPageSize = pageSize;
+  const start = (state.productPage - 1) * pageSize;
+  const rows = filtered.slice(start, start + pageSize);
 
   kpi('prod-kpis', [
     { icon: 'package', value: allProducts.length, label: 'Total de produtos', delta: 'Cadastrados' },
@@ -499,9 +502,18 @@ renderProducts = function () {
 };
 
 function renderProductPagination(total, start, visible) {
-  const pages = Math.max(1, Math.ceil(total / state.productPageSize));
-  const buttons = Array.from({ length: pages }, (_, index) => index + 1).slice(Math.max(0, state.productPage - 3), state.productPage + 2);
-  $('prod-pagination').innerHTML = `<span class="pagination-summary">Mostrando ${total ? start + 1 : 0} a ${start + visible} de ${total} produtos</span><span class="pagination-controls"><button class="pg-btn" ${state.productPage === 1 ? 'disabled' : ''} onclick="state.productPage--;renderProducts()" aria-label="Página anterior"><i data-lucide="chevron-left"></i></button>${buttons.map(page => `<button class="pg-btn ${page === state.productPage ? 'active' : ''}" onclick="state.productPage=${page};renderProducts()">${page}</button>`).join('')}<button class="pg-btn" ${state.productPage === pages ? 'disabled' : ''} onclick="state.productPage++;renderProducts()" aria-label="Próxima página"><i data-lucide="chevron-right"></i></button></span>`;
+  const pageSize = Number(state.productPageSize) || 10;
+  const currentPage = Number(state.productPage) || 1;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const safeStart = Number(start) || 0;
+  const safeVisible = Number(visible) || 0;
+  const firstItem = total > 0 ? safeStart + 1 : 0;
+  const lastItem = total > 0 ? Math.min(total, safeStart + safeVisible) : 0;
+  const buttons = Array.from({ length: pages }, (_, index) => index + 1).slice(Math.max(0, currentPage - 3), currentPage + 2);
+  const pagEl = $('prod-pagination');
+  if (pagEl) {
+    pagEl.innerHTML = `<span class="pagination-summary">Mostrando ${firstItem} a ${lastItem} de ${total} produtos</span><span class="pagination-controls"><button class="pg-btn" ${currentPage === 1 ? 'disabled' : ''} onclick="state.productPage--;renderProducts()" aria-label="Página anterior"><i data-lucide="chevron-left"></i></button>${buttons.map(page => `<button class="pg-btn ${page === currentPage ? 'active' : ''}" onclick="state.productPage=${page};renderProducts()">${page}</button>`).join('')}<button class="pg-btn" ${currentPage === pages ? 'disabled' : ''} onclick="state.productPage++;renderProducts()" aria-label="Próxima página"><i data-lucide="chevron-right"></i></button></span>`;
+  }
   refreshInterfaceIcons();
 }
 
@@ -533,7 +545,7 @@ abrirModalProduto = function (id = '') {
         <div class="form-group"><label>Descrição</label><textarea name="desc" rows="2" placeholder="Descrição curta para identificação" maxlength="255">${esc(current.desc || '')}</textarea></div>
         <div class="form-row"><div class="form-group"><label>Categoria</label><select name="categoria" onchange="atualizarFallbackProduto(this.value)">${DB.get('categorias').map(category => `<option ${category === current.categoria ? 'selected' : ''}>${esc(category)}</option>`).join('')}</select></div><div class="form-group"><label>Localização</label><input name="local" value="${esc(current.local || '')}" placeholder="Ex.: Almoxarifado 01" maxlength="50"></div></div>
         <div class="form-group"><label>Fornecedor principal</label><input name="fornecedor" value="${esc(current.fornecedor || '')}" placeholder="Nome do fornecedor" maxlength="100"></div>
-        <div class="form-row three"><div class="form-group"><label>Estoque atual</label><input type="number" name="estoqueAtual" value="${Number(current.estoqueAtual) || 0}" min="0" step="0.01" required></div><div class="form-group"><label>Estoque mínimo</label><input type="number" name="estoqueMin" value="${Number(current.estoqueMin) || 0}" min="0" step="0.01" required></div><div class="form-group"><label>Estoque máximo</label><input type="number" name="estoqueMax" value="${Number(current.estoqueMax) || 0}" min="0" step="0.01" required></div></div>
+        <div class="form-row three"><div class="form-group"><label>Estoque atual</label><input type="number" name="estoqueAtual" value="${Number(current.estoqueAtual) || 0}" min="0" step="1" required></div><div class="form-group"><label>Estoque mínimo</label><input type="number" name="estoqueMin" value="${Number(current.estoqueMin) || 0}" min="0" step="1" required></div><div class="form-group"><label>Estoque máximo</label><input type="number" name="estoqueMax" value="${Number(current.estoqueMax) || 0}" min="0" step="1" required></div></div>
         <div class="form-row"><div class="form-group"><label>Custo unitário (R$)</label><input type="number" name="custo" value="${Number(current.custo) || 0}" min="0" step="0.01" required></div><div class="form-group"><label>Situação</label><select name="ativo"><option value="true" ${current.ativo !== false ? 'selected' : ''}>Ativo</option><option value="false" ${current.ativo === false ? 'selected' : ''}>Inativo</option></select></div></div>
       </div>
     </div>

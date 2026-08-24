@@ -11,7 +11,9 @@ const state = {
   activeAutomacaoId: null,
   searchQuery: '',
   clientIp: '127.0.0.1',
-  clientDevice: detectDevice()
+  clientDevice: detectDevice(),
+  productPage: 1,
+  productPageSize: 10
 };
 
 function detectDevice() {
@@ -860,7 +862,7 @@ function abrirModalProduto(id = null) {
         </div>
         <div class="form-group">
           <label>Estoque Atual *</label>
-          <input type="number" id="p-atual" value="${Number(p?.estoqueAtual) || 0}" min="0" step="0.01" required>
+          <input type="number" id="p-atual" value="${Number(p?.estoqueAtual) || 0}" min="0" step="1" required>
         </div>
         <div class="form-group">
           <label>Custo Unitário (R$) *</label>
@@ -870,11 +872,11 @@ function abrirModalProduto(id = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Estoque Mínimo *</label>
-          <input type="number" id="p-min" value="${Number(p?.estoqueMin) || 0}" min="0" step="0.01" required>
+          <input type="number" id="p-min" value="${Number(p?.estoqueMin) || 0}" min="0" step="1" required>
         </div>
         <div class="form-group">
           <label>Estoque Máximo *</label>
-          <input type="number" id="p-max" value="${Number(p?.estoqueMax) || 0}" min="0" step="0.01" required>
+          <input type="number" id="p-max" value="${Number(p?.estoqueMax) || 0}" min="0" step="1" required>
         </div>
       </div>
       <div class="form-row">
