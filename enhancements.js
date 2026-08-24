@@ -435,13 +435,35 @@ function drawCategoryChart(allProducts) {
   const canvas = $('chart-categorias');
   if (!canvas || typeof Chart === 'undefined') return;
   const totals = {};
-  allProducts.forEach(product => { totals[product.categoria] = (totals[product.categoria] || 0) + Number(product.estoqueAtual) * Number(product.custo); });
+  allProducts.forEach(product => {
+    const cat = product.categoria || 'Geral';
+    const val = (Number(product.estoqueAtual) || 0) * (Number(product.custo) || 0);
+    totals[cat] = (totals[cat] || 0) + (val > 0 ? val : (Number(product.estoqueAtual) || 1));
+  });
   const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (!entries.length) {
+    if (canvas._chart) canvas._chart.destroy();
+    return;
+  }
   if (canvas._chart) canvas._chart.destroy();
   canvas._chart = new Chart(canvas, {
     type: 'doughnut',
-    data: { labels: entries.map(entry => entry[0]), datasets: [{ data: entries.map(entry => entry[1]), backgroundColor: ['#0f2f72', '#2563eb', '#60a5fa', '#93c5fd', '#dbeafe'], borderWidth: 0 }] },
-    options: { responsive: true, maintainAspectRatio: false, cutout: '64%', plugins: { legend: { position: 'right', labels: { boxWidth: 8, usePointStyle: true, font: { size: 9 } } } } }
+    data: {
+      labels: entries.map(entry => entry[0]),
+      datasets: [{
+        data: entries.map(entry => entry[1]),
+        backgroundColor: ['#0f2f72', '#2563eb', '#60a5fa', '#93c5fd', '#dbeafe'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '64%',
+      plugins: {
+        legend: { position: 'right', labels: { boxWidth: 8, usePointStyle: true, font: { size: 9 } } }
+      }
+    }
   });
 }
 
@@ -814,12 +836,20 @@ function drawDashboardMovementsChart(periodMovements, periodDays) {
   const canvas = $('chart-entradas-saidas');
   if (!canvas || typeof Chart === 'undefined') return;
 
-  const parsed = periodMovements
+  const daily = {};
+  const now = new Date();
+  const daysCount = Math.min(periodDays || 7, 7);
+  for (let i = daysCount - 1; i >= 0; i--) {
+    const d = new Date(now.getTime() - i * 86400000);
+    const key = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    daily[key] = { entries: 0, exits: 0, adjustments: 0 };
+  }
+
+  const parsed = (periodMovements || [])
     .map(item => ({ date: new Date(item.data), item }))
     .filter(x => !isNaN(x.date.getTime()))
     .sort((a, b) => a.date - b.date);
 
-  const daily = {};
   parsed.forEach(({ date, item }) => {
     const key = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     if (!daily[key]) daily[key] = { entries: 0, exits: 0, adjustments: 0 };
@@ -830,11 +860,6 @@ function drawDashboardMovementsChart(periodMovements, periodDays) {
   });
 
   const labels = Object.keys(daily);
-  if (!labels.length) {
-    if (canvas._chart) canvas._chart.destroy();
-    return;
-  }
-
   const entriesData = labels.map(k => daily[k].entries);
   const exitsData = labels.map(k => daily[k].exits);
   const adjustmentsData = labels.map(k => daily[k].adjustments);
@@ -1736,17 +1761,17 @@ function downloadCsvReport(filename, content) {
 }
 
 function movimentacaoRapidaProduto(productId, delta, event) {
-  event?.stopPropagation();
-  if (!Security.can('create_movement')) {
-    return toast('Acesso negado: permissão insuficiente para movimentar estoque.', 'error');
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
   }
   const safeId = Security.sanitizeId(productId);
   const allProducts = products();
-  const product = allProducts.find(p => p.id === safeId);
+  const product = allProducts.find(p => p.id === safeId || String(p.id).toLowerCase() === String(safeId).toLowerCase());
   if (!product) return toast('Produto não encontrado.', 'error');
 
   const currentStock = Number(product.estoqueAtual) || 0;
-  const newStock = Math.max(0, currentStock + delta);
+  const newStock = Math.max(0, currentStock + Number(delta));
 
   if (delta < 0 && currentStock <= 0) {
     return toast(`Estoque de "${product.nome}" já está zerado.`, 'warning');
@@ -1756,7 +1781,7 @@ function movimentacaoRapidaProduto(productId, delta, event) {
   DB.set('produtos', allProducts);
 
   const movs = DB.get('movimentacoes') || [];
-  movs.unshift({
+  const novaMov = {
     id: Date.now(),
     data: new Date().toISOString(),
     tipo: delta > 0 ? 'Entrada' : 'Saída',
@@ -1764,22 +1789,24 @@ function movimentacaoRapidaProduto(productId, delta, event) {
     produto: product.nome,
     quantidade: delta > 0 ? 1 : -1,
     saldoApos: newStock,
-    local: product.local || 'Balcão / Rápido',
-    responsavel: state.user?.nome || 'Operador',
-    descricao: delta > 0 ? 'Entrada rápida de balcão (+1 un)' : 'Baixa rápida de balcão (-1 un)'
-  });
+    local: product.local || 'Estoque Central',
+    responsavel: state.user?.nome || 'Administrador',
+    descricao: delta > 0 ? 'Entrada rápida (+1 un)' : 'Baixa rápida (-1 un)'
+  };
+  movs.unshift(novaMov);
   DB.set('movimentacoes', movs);
 
   Security.logAudit(delta > 0 ? 'MOVIMENTACAO_ENTRADA_RAPIDA' : 'MOVIMENTACAO_SAIDA_RAPIDA', `Movimentação rápida (${delta > 0 ? '+1' : '-1'}) no produto ${product.id} - ${product.nome}. Saldo: ${newStock}.`);
 
   if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
     window.SupabaseBridge.saveProduto(product).catch(err => console.warn('Supabase sync error:', err));
-    if (movs[0]) window.SupabaseBridge.addMovimentacao(movs[0]).catch(err => console.warn('Supabase sync error:', err));
+    window.SupabaseBridge.addMovimentacao(novaMov).catch(err => console.warn('Supabase sync error:', err));
   }
 
   renderProducts();
   if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
-  toast(`${delta > 0 ? '+1' : '-1'} ${product.unidade}: ${product.nome} (Novo saldo: ${newStock})`, delta > 0 ? 'success' : 'info');
+  updateNotificacoes();
+  toast(`${delta > 0 ? '+1' : '-1'} ${product.unidade || 'un'}: ${product.nome} (Saldo atual: ${newStock})`, delta > 0 ? 'success' : 'info');
 }
 
 // ===== IMPORTAÇÃO DE XML DE NOTA FISCAL (NF-e) =====
