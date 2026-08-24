@@ -1,6 +1,8 @@
 /* Melhorias operacionais e visuais alinhadas às telas de referência. */
 
-const slug = str => String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+window.slug = window.slug || function(str) {
+  return String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+};
 
 function epStatus(product) {
   const current = Number(product.estoqueAtual) || 0;
