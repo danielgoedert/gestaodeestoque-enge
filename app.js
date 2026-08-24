@@ -281,6 +281,16 @@ function loginSuccess(u) {
   $('page-login').classList.remove('active');
   $('app').classList.remove('hidden');
 
+  // Limpa resíduos de produtos demo antigos para não poluir contas em nuvem
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    const cur = DB.get('produtos');
+    if (cur && cur.some(p => p.id === 'MP-0001')) {
+      DB.set('produtos', []);
+      DB.set('movimentacoes', []);
+      DB.set('fornecedores', []);
+    }
+  }
+
   const avatar = esc(u.avatar || u.nome?.slice(0, 2).toUpperCase() || 'US');
   $('user-avatar-sb').textContent = avatar;
   $('user-name-sb').textContent = esc(u.nome);
@@ -309,13 +319,18 @@ async function syncSupabaseCloudData() {
         window.SupabaseBridge.getMovimentacoes(),
         window.SupabaseBridge.getFornecedores()
       ]);
-      if (prods && prods.length) DB.set('produtos', prods);
-      if (movs && movs.length) DB.set('movimentacoes', movs);
-      if (forns && forns.length) DB.set('fornecedores', forns);
+      
+      DB.set('produtos', Array.isArray(prods) ? prods : []);
+      DB.set('movimentacoes', Array.isArray(movs) ? movs : []);
+      DB.set('fornecedores', Array.isArray(forns) ? forns : []);
+      
       renderProducts();
       renderMovimentacoes();
       renderFornecedores();
       renderDashboard();
+      updateNotificacoes();
+      if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
+      refreshIcons();
     } catch (e) {
       console.warn('Erro ao sincronizar dados da nuvem Supabase:', e);
     }

@@ -370,9 +370,15 @@ const DB = {
       ]);
     }
 
-    // 3. Em modo Supabase Cloud: NÃO injeta dados mock/demo para manter cada empresa 100% limpa e isolada
+    // 3. Em modo Supabase Cloud: NÃO injeta dados mock/demo e limpa resíduos de testes anteriores
     const isCloud = (typeof window !== 'undefined' && window.SupabaseBridge && window.SupabaseBridge.isConfigured());
     if (isCloud) {
+      const curProds = this.get('produtos');
+      if (curProds && curProds.some(p => p.id === 'MP-0001')) {
+        this.set('produtos', []);
+        this.set('movimentacoes', []);
+        this.set('fornecedores', []);
+      }
       if (!localStorage.getItem('ep_produtos')) this.set('produtos', []);
       if (!localStorage.getItem('ep_movimentacoes')) this.set('movimentacoes', []);
       if (!localStorage.getItem('ep_fornecedores')) this.set('fornecedores', []);
