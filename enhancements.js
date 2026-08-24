@@ -213,8 +213,8 @@ function renderPerformanceIndicators(allProducts, movements, replenishmentCount,
 }
 
 renderDashboard = function () {
-  const allProducts = products();
-  const movements = DB.get('movimentacoes');
+  const allProducts = products() || [];
+  const movements = DB.get('movimentacoes') || [];
   const inventoryValue = allProducts.reduce((sum, product) => sum + Number(product.estoqueAtual) * Number(product.custo), 0);
   const withoutStock = allProducts.filter(product => epStatus(product) === 'Sem estoque');
   const critical = allProducts.filter(product => epStatus(product) === 'Crítico');
@@ -675,7 +675,7 @@ function abrirDetalhesProduto(id) {
   const safeId = Security.sanitizeId(id);
   const product = products().find(item => item.id === safeId);
   if (!product) return toast('Produto não encontrado.', 'error');
-  const movements = DB.get('movimentacoes').filter(movement => movement.produtoId === safeId).slice(0, 6);
+  const movements = (DB.get('movimentacoes') || []).filter(movement => movement.produtoId === safeId).slice(0, 6);
   const current = Number(product.estoqueAtual) || 0;
   const maximum = Number(product.estoqueMax) || 0;
   const minimum = Number(product.estoqueMin) || 0;

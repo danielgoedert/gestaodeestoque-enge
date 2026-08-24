@@ -32,11 +32,23 @@ const SupabaseBridge = {
 
   init() {
     const savedToken = localStorage.getItem('ep_sb_token') || sessionStorage.getItem('ep_sb_token');
-    if (savedToken) {
-      this.token = savedToken;
+    if (savedToken) this.token = savedToken;
+    const savedPerfil = localStorage.getItem('ep_sb_perfil') || sessionStorage.getItem('ep_sb_perfil');
+    if (savedPerfil) {
+      try { this.currentPerfil = JSON.parse(savedPerfil); } catch {}
     }
     console.log('✅ Supabase Bridge nativo inicializado!');
     return this;
+  },
+
+  getEmpresaId() {
+    if (this.currentPerfil?.empresa_id) return this.currentPerfil.empresa_id;
+    if (typeof state !== 'undefined' && state.user?.empresaId) return state.user.empresaId;
+    try {
+      const u = JSON.parse(localStorage.getItem('ep_user') || sessionStorage.getItem('ep_user') || '{}');
+      if (u.empresaId) return u.empresaId;
+    } catch {}
+    return '11111111-1111-1111-1111-111111111111';
   },
 
   // ===== AUTENTICAÇÃO DIRETA =====
@@ -79,14 +91,21 @@ const SupabaseBridge = {
     }
 
     this.currentPerfil = perfil;
+    if (perfil) {
+      localStorage.setItem('ep_sb_perfil', JSON.stringify(perfil));
+      sessionStorage.setItem('ep_sb_perfil', JSON.stringify(perfil));
+    }
+
+    const resolvedEmpresaId = perfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
+    const resolvedEmpresaNome = perfil?.empresas?.nome || (perfil?.nome ? `${perfil.nome} - Estoque` : 'EngePro Gestão de Estoque');
 
     return {
       id: data.user.id,
       email: data.user.email,
       nome: perfil?.nome || data.user.email.split('@')[0],
       perfil: perfil?.perfil || 'Administrador',
-      empresaId: perfil?.empresa_id || '11111111-1111-1111-1111-111111111111',
-      empresaNome: perfil?.empresas?.nome || 'EngePro Gestão de Estoque',
+      empresaId: resolvedEmpresaId,
+      empresaNome: resolvedEmpresaNome,
       avatar: perfil?.avatar || 'AD'
     };
   },
@@ -97,6 +116,8 @@ const SupabaseBridge = {
     this.currentPerfil = null;
     localStorage.removeItem('ep_sb_token');
     sessionStorage.removeItem('ep_sb_token');
+    localStorage.removeItem('ep_sb_perfil');
+    sessionStorage.removeItem('ep_sb_perfil');
   },
 
   // ===== PRODUTOS =====
@@ -129,7 +150,7 @@ const SupabaseBridge = {
 
   async saveProduto(prod) {
     if (!this.isConfigured()) return null;
-    const empresaId = this.currentPerfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
+    const empresaId = this.getEmpresaId();
     const payload = {
       id: prod.id,
       empresa_id: empresaId,
@@ -202,7 +223,7 @@ const SupabaseBridge = {
 
   async addMovimentacao(mov) {
     if (!this.isConfigured()) return null;
-    const empresaId = this.currentPerfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
+    const empresaId = this.getEmpresaId();
     const payload = {
       empresa_id: empresaId,
       produto_id: mov.produtoId || mov.produto,
@@ -256,7 +277,7 @@ const SupabaseBridge = {
 
   async saveFornecedor(forn) {
     if (!this.isConfigured()) return null;
-    const empresaId = this.currentPerfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
+    const empresaId = this.getEmpresaId();
     const payload = {
       empresa_id: empresaId,
       nome: forn.nome,

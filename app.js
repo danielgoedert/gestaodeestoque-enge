@@ -131,11 +131,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const u = JSON.parse(saved);
       const now = Date.now();
-      const loginTime = u.loginTime || 0;
+      const loginTime = u.loginTime || now;
       const isRemembered = !!localStorage.getItem('ep_user');
       const maxAge = isRemembered ? 30 * 24 * 60 * 60 * 1000 : 8 * 60 * 60 * 1000;
       
-      if (loginTime && (now - loginTime < maxAge)) {
+      if (u.id && u.email && (now - loginTime < maxAge)) {
+        u.loginTime = loginTime;
         loginSuccess(u);
         return;
       } else {
@@ -158,37 +159,33 @@ async function doLogin(event) {
   if (event) event.preventDefault();
 
   // 1. Verificação de Bloqueio por Força Bruta (Rate Limiting)
-  const rateLimit = Security.checkRateLimit();
-  if (!rateLimit.allowed) {
-    toast(`Muitas tentativas inválidas. Tente novamente em ${rateLimit.remainingSec}s.`, 'error');
-    Security.logAudit('LOGIN_BLOQUEADO_RATE_LIMIT', 'Tentativa de login durante período de bloqueio.', 'CRITICAL');
+  const rateStatus = Security.checkRateLimit();
+  if (!rateStatus.allowed) {
+    toast(`Muitas tentativas incorretas. Tente novamente em ${rateStatus.remainingSeconds}s.`, 'error');
     return;
   }
 
-  const emailRaw = $('login-email')?.value || '';
-  const senhaRaw = $('login-senha')?.value || '';
+  const email = ($('login-email')?.value || '').trim();
+  const senha = $('login-senha')?.value || '';
 
-  // 2. Proteção contra SQL Injection nos campos de autenticação
-  if (Security.detectSqlInjection(emailRaw) || Security.detectSqlInjection(senhaRaw)) {
-    Security.logAudit('SQL_INJECTION_DETECTADA', `Tentativa de SQL Injection no formulário de login para: ${emailRaw.slice(0, 50)}`, 'CRITICAL');
-    Security.recordFailedLogin();
-    toast('Credenciais inválidas.', 'error');
-    return;
-  }
-
-  const email = Security.sanitizeText(emailRaw, 100).toLowerCase().trim();
-  const senha = senhaRaw.slice(0, 100);
-
+  // 2. Validações de Entrada e Anti-SQL Injection
   if (!email || !senha) {
     toast('Preencha todos os campos.', 'error');
     return;
   }
 
-  // 3. Autenticação via Supabase Cloud (se configurado)
+  if (Security.detectSqlInjection(email) || Security.detectSqlInjection(senha)) {
+    Security.logAudit('SQL_INJECTION_DETECTADA', `Tentativa de login com SQL Injection: ${email}`, 'CRITICAL');
+    toast('Caracteres não permitidos identificados.', 'error');
+    return;
+  }
+
+  // 3. Tenta autenticação nativa em nuvem via Supabase Bridge se configurado
   if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
     try {
       const userSession = await window.SupabaseBridge.login(email, senha);
       if (userSession) {
+        userSession.loginTime = Date.now();
         Security.resetRateLimit();
         const rememberChecked = $('remember')?.checked;
         if (rememberChecked) {
@@ -322,14 +319,12 @@ async function syncSupabaseCloudData() {
         window.SupabaseBridge.getFornecedores()
       ]);
       
-      DB.set('produtos', Array.isArray(prods) ? prods : []);
-      DB.set('movimentacoes', Array.isArray(movs) ? movs : []);
-      DB.set('fornecedores', Array.isArray(forns) ? forns : []);
+      if (Array.isArray(prods)) DB.set('produtos', prods);
+      if (Array.isArray(movs)) DB.set('movimentacoes', movs);
+      if (Array.isArray(forns)) DB.set('fornecedores', forns);
       
-      renderProducts();
-      renderMovimentacoes();
-      renderFornecedores();
       renderDashboard();
+      if (state.page && typeof renderPage === 'function') renderPage(state.page);
       updateNotificacoes();
       if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
       refreshIcons();
