@@ -282,14 +282,11 @@ function loginSuccess(u) {
   $('page-login').classList.remove('active');
   $('app').classList.remove('hidden');
 
-  // Limpa resíduos de produtos demo antigos para não poluir contas em nuvem
+  // Limpa o cache local em memória para garantir isolamento total entre contas
   if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
-    const cur = DB.get('produtos');
-    if (cur && cur.some(p => p.id === 'MP-0001')) {
-      DB.set('produtos', []);
-      DB.set('movimentacoes', []);
-      DB.set('fornecedores', []);
-    }
+    DB.set('produtos', []);
+    DB.set('movimentacoes', []);
+    DB.set('fornecedores', []);
   }
 
   const avatar = esc(u.avatar || u.nome?.slice(0, 2).toUpperCase() || 'US');
@@ -321,18 +318,10 @@ async function syncSupabaseCloudData() {
         window.SupabaseBridge.getFornecedores()
       ]);
       
-      const localProds = DB.get('produtos') || [];
-      
-      // Se a nuvem retornou produtos, atualiza o cache local
-      if (Array.isArray(prods) && prods.length > 0) {
-        DB.set('produtos', prods);
-      } else if (Array.isArray(prods) && prods.length === 0 && localProds.length > 0) {
-        // Se a nuvem ainda não tinha os itens locais, envia o lote inteiro
-        window.SupabaseBridge.saveProdutosBatch(localProds).catch(err => console.warn('Sync batch error:', err));
-      }
-      
-      if (Array.isArray(movs)) DB.set('movimentacoes', movs);
-      if (Array.isArray(forns)) DB.set('fornecedores', forns);
+      // O estoque local SEMPRE reflete 100% o que está no banco de dados da nuvem DESTE usuário
+      DB.set('produtos', Array.isArray(prods) ? prods : []);
+      DB.set('movimentacoes', Array.isArray(movs) ? movs : []);
+      DB.set('fornecedores', Array.isArray(forns) ? forns : []);
       
       renderDashboard();
       if (state.page && typeof renderPage === 'function') renderPage(state.page);
@@ -356,7 +345,15 @@ function doLogout() {
   localStorage.removeItem('ep_movimentacoes');
   localStorage.removeItem('ep_fornecedores');
   localStorage.removeItem('ep_pedidos');
+  localStorage.removeItem('ep_sb_token');
+  localStorage.removeItem('ep_sb_perfil');
+  sessionStorage.removeItem('ep_sb_token');
+  sessionStorage.removeItem('ep_sb_perfil');
   state.user = null;
+  DB.set('produtos', []);
+  DB.set('movimentacoes', []);
+  DB.set('fornecedores', []);
+
   $('app').classList.add('hidden');
   $('page-login').classList.add('active');
   $('login-senha').value = '';
