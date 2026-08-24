@@ -1220,10 +1220,19 @@ function executarImportacaoProdutos() {
   }
 
   DB.set('produtos', currentProducts);
+
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    currentProducts.forEach(p => {
+      window.SupabaseBridge.saveProduto(p).catch(err => console.warn('Supabase sync error:', err));
+    });
+  }
+
   Security.logAudit('IMPORTACAO_PLANILHA', `Importação de planilha concluída. ${countAdded} adicionados, ${countUpdated} atualizados.`);
   fecharModal();
   renderProducts();
+  renderDashboard();
   updateNotificacoes();
+  refreshIcons();
   toast(`Importação concluída! (${countAdded} adicionados, ${countUpdated} atualizados)`, 'success');
 }
 

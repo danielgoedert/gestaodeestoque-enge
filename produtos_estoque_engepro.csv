@@ -1,0 +1,47 @@
+Codigo;Produto;Descricao;Categoria;Unidade;EstoqueAtual;EstoqueMin;EstoqueMax;Custo;Fornecedor;Localizacao
+MP-101;Tubo de Aço Carbono 2";Tubo schedule 40 costura 6m;Matéria-prima;m;150;40;300;45.80;Metalúrgica São José;Galpão A - Rua 1
+MP-102;Chapa de Aço Inox 304 3mm;Chapa escovada 1200x3000mm;Matéria-prima;kg;850;200;1200;32.50;Aço Forte Ltda;Galpão A - Rua 2
+MP-103;Barra Redonda de Latão 1";Barra maciça trefilada 3m;Matéria-prima;kg;120;30;200;58.00;Metalúrgica São José;Galpão A - Rua 1
+MP-104;Perfil Estrutural Viga U 4";Viga laminada padrão ASTM A36;Matéria-prima;m;90;25;180;74.20;Aço Forte Ltda;Galpão A - Rua 3
+MP-105;Chapa de Alumínio Naval 2mm;Chapa liga 5052-H32;Matéria-prima;kg;340;100;500;42.00;Alumínio do Brasil;Galpão A - Rua 2
+MP-106;Tarugo de Nylon 6.0 Ø50mm;Tarugo redondo usinável 1m;Matéria-prima;un;45;15;80;89.90;Polímeros Industriais;Almoxarifado 01
+MP-107;Bobina de Cobre Eletrolítico;Fita de cobre 0.5x50mm;Matéria-prima;kg;80;30;150;115.00;Metalúrgica São José;Almoxarifado 01
+COMP-201;Parafuso Sextavado Inox M10x30;Rosca inteira DIN 933;Componentes;un;1400;500;3000;1.85;Parafusos Brasil;Almoxarifado 02 - Gaveta 10
+COMP-202;Porca Auto-Travante M10;Aço zincado com nylon DIN 985;Componentes;un;1850;600;4000;0.65;Parafusos Brasil;Almoxarifado 02 - Gaveta 11
+COMP-203;Arruela de Pressão M10;Aço mola DIN 127;Componentes;un;3200;1000;5000;0.22;Parafusos Brasil;Almoxarifado 02 - Gaveta 12
+COMP-204;Rolamento Rígido de Esferas 6205-2RS;Blindagem dupla D=52mm d=25mm;Componentes;un;38;20;80;34.50;SKF Rolamentos;Almoxarifado 02 - Prateleira B
+COMP-205;Retentor de Óleo 35x52x8;Nitrílica com mola;Componentes;un;55;25;100;14.80;Vedtech Vedações;Almoxarifado 02 - Prateleira B
+COMP-206;Mola de Compressão 15x45mm;Aço mola 2mm diâmetro;Componentes;un;120;40;250;6.30;Molasul Industrial;Almoxarifado 02 - Gaveta 15
+COMP-207;Chaveta Paralela 8x7x40mm;Aço 1045 DIN 6885;Componentes;un;210;50;400;3.40;Parafusos Brasil;Almoxarifado 02 - Gaveta 16
+COMP-208;Anel Elástico para Eixo Ø25mm;Aço carbono DIN 471;Componentes;un;450;150;800;0.90;Vedtech Vedações;Almoxarifado 02 - Gaveta 14
+EMB-301;Caixa de Papelão Reforçada G;Onda dupla 60x40x40cm;Embalagem;un;320;100;600;8.90;Embalagens Brasil;Galpão B - Palete 01
+EMB-302;Caixa de Papelão Padrão M;Onda simples 35x25x20cm;Embalagem;un;540;200;1000;4.50;Embalagens Brasil;Galpão B - Palete 02
+EMB-303;Filme Stretch Manual 500mm x 0,025mm;Bobina virgem com tubete 3.5kg;Embalagem;un;28;15;60;42.00;Embalagens Brasil;Galpão B - Prateleira 1
+EMB-304;Fita Adesiva Gomada 70mm;Reforçada com fios de poliéster;Embalagem;un;45;20;90;29.90;Embalagens Brasil;Galpão B - Prateleira 1
+EMB-305;Bobina Plástico Bolha 1.20x100m;Micragem pesada 50 micras;Embalagem;un;12;8;25;125.00;Embalagens Brasil;Galpão B - Prateleira 2
+EMB-306;Palete de Madeira PBR 1000x1200mm;Madeira tratada padrão Abras;Embalagem;un;65;30;120;55.00;Paletes União;Pátio Externo 01
+EMB-307;Cantoneira Plástica para Paletização;Polipropileno 50x50mm;Embalagem;un;800;300;1500;0.75;Embalagens Brasil;Galpão B - Prateleira 2
+MC-401;Óleo Hidráulico ISO VG 68;Tambor 200L óleo lubrificante mineral;Material de Consumo;L;400;150;800;16.80;LogiSteel Distribuidora;Área de Inflamáveis
+MC-402;Disco de Corte Inox 4.1/2" x 1.0mm;Disco abrasivo fino corte rápido;Material de Consumo;un;180;50;300;5.40;Ferramentas Gerais;Almoxarifado 03 - Prateleira A
+MC-403;Arame de Solda MIG ER70S-6 1.2mm;Carretel metálico 18kg;Material de Consumo;un;14;6;30;245.00;Soldas Brasil;Almoxarifado 03 - Prateleira B
+MC-404;Graxa Azul para Rolamentos MP-2;Balde 20kg base de lítio;Material de Consumo;un;6;3;12;380.00;LogiSteel Distribuidora;Área de Inflamáveis
+MC-405;Estopa Branca para Limpeza;Fardo prensado 20kg;Material de Consumo;un;18;8;35;78.00;LogiSteel Distribuidora;Almoxarifado 03 - Prateleira C
+MC-406;Desengripante Spray WD-40 300ml;Aerossol antiferrugem multiuso;Material de Consumo;un;32;15;60;28.50;Ferramentas Gerais;Almoxarifado 03 - Prateleira A
+MC-407;Fita Veda Rosca 18mm x 50m;PTFE 100% puro;Material de Consumo;un;75;25;150;6.20;Vedtech Vedações;Almoxarifado 03 - Gaveta 05
+EPI-501;Óculos de Segurança Nemesis Incolor;Lente policarbonato antirrisco UV;EPI;un;48;20;100;19.90;Tradição Representações;Armário EPI - Prateleira 1
+EPI-502;Luva de Raspa Soldador Cano Longo;Couro vacum com forro térmico;EPI;par;62;25;120;27.50;Tradição Representações;Armário EPI - Prateleira 2
+EPI-503;Protetor Auricular Tipo Concha 22dB;Haste acolchoada confortável;EPI;un;35;15;60;38.00;Tradição Representações;Armário EPI - Prateleira 1
+EPI-504;Respirador PFF2 / N95 com Válvula;Proteção contra fumos metálicos;EPI;un;140;50;300;5.20;Tradição Representações;Armário EPI - Prateleira 3
+EPI-505;Botina de Segurança com Bico de Composite;Couro nobuck fechamento elástico;EPI;par;18;10;40;142.00;Tradição Representações;Armário EPI - Prateleira 4
+EPI-506;Capacete de Segurança com Jugular;Classe B aba frontal injetado em PE;EPI;un;25;12;50;26.00;Tradição Representações;Armário EPI - Prateleira 1
+EPI-507;Avental de Raspa para Soldador;Couro legítimo 120x60cm com tiras;EPI;un;15;8;30;46.00;Tradição Representações;Armário EPI - Prateleira 2
+ELE-601;Cabo Flexível 2,5mm² 750V Preto;Rolo 100m condutor de cobre;Elétrica;m;600;200;1200;2.30;EletroComercial Paulista;Almoxarifado Elétrico
+ELE-602;Disjuntor Bipolar Din 32A Curva C;Capacidade de interrupção 4.5kA;Elétrica;un;22;10;50;36.90;EletroComercial Paulista;Almoxarifado Elétrico
+ELE-603;Contator Tripolar 24VCC 18A;Três polos principais + 1NA auxiliar;Elétrica;un;12;5;25;128.00;EletroComercial Paulista;Almoxarifado Elétrico
+ELE-604;Fita Isolante 3M Imperial 19mmx20m;Antichama até 750V;Elétrica;un;85;30;180;8.50;EletroComercial Paulista;Almoxarifado Elétrico
+ELE-605;Sensor Indutivo M18 PNP NA;Distância sensora 8mm cabo 2m;Elétrica;un;9;4;20;89.00;Automação Brasil;Almoxarifado Elétrico
+HID-701;Válvula de Esfera Tripartida Inox 1";Passagem plena rosca NPT 1000 WOG;Hidráulica;un;14;6;30;165.00;Válvulas & Tubos Brasil;Almoxarifado Hidráulico
+HID-702;Mangueira Hidráulica 2 Tramas 1/2";Pressão trabalho 275 bar SAE 100R2AT;m;45;15;100;48.00;Mangueiras Hidráulicas Ltda;Almoxarifado Hidráulico
+HID-703;Niple Duplo Sextavado Latão 1/2";Rosca BSP usinado;Hidráulica;un;95;30;200;7.40;Válvulas & Tubos Brasil;Almoxarifado Hidráulico
+HID-704;Manômetro com Glicerina 0-250 bar;Caixa inox diâmetro 63mm saída vertical;Hidráulica;un;8;4;18;94.50;Automação Brasil;Almoxarifado Hidráulico
+HID-705;Registro de Gaveta Bronze 1.1/2";Padrão ABNT NBR 15705;Hidráulica;un;11;5;22;86.00;Válvulas & Tubos Brasil;Almoxarifado Hidráulico
