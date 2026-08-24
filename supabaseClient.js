@@ -182,6 +182,40 @@ const SupabaseBridge = {
     }
   },
 
+  async saveProdutosBatch(prods) {
+    if (!this.isConfigured() || !Array.isArray(prods) || !prods.length) return false;
+    const empresaId = this.getEmpresaId();
+    const payload = prods.map(prod => ({
+      id: prod.id,
+      empresa_id: empresaId,
+      nome: prod.nome,
+      descricao: prod.desc || '',
+      categoria: prod.categoria || 'Outros',
+      unidade: prod.unidade || 'un',
+      estoque_atual: prod.estoqueAtual || 0,
+      estoque_min: prod.estoqueMin || 0,
+      estoque_max: prod.estoqueMax || 0,
+      custo: prod.custo || 0,
+      fornecedor: prod.fornecedor || '',
+      localizacao: prod.local || '',
+      updated_at: new Date().toISOString()
+    }));
+    try {
+      const res = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/produtos`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(true),
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(payload)
+      });
+      return res.ok;
+    } catch (e) {
+      console.warn('Erro ao salvar lote de produtos no Supabase:', e);
+      return false;
+    }
+  },
+
   async deleteProduto(id) {
     if (!this.isConfigured()) return null;
     try {

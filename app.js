@@ -321,7 +321,16 @@ async function syncSupabaseCloudData() {
         window.SupabaseBridge.getFornecedores()
       ]);
       
-      if (Array.isArray(prods)) DB.set('produtos', prods);
+      const localProds = DB.get('produtos') || [];
+      
+      // Se a nuvem retornou produtos, atualiza o cache local
+      if (Array.isArray(prods) && prods.length > 0) {
+        DB.set('produtos', prods);
+      } else if (Array.isArray(prods) && prods.length === 0 && localProds.length > 0) {
+        // Se a nuvem ainda não tinha os itens locais, envia o lote inteiro
+        window.SupabaseBridge.saveProdutosBatch(localProds).catch(err => console.warn('Sync batch error:', err));
+      }
+      
       if (Array.isArray(movs)) DB.set('movimentacoes', movs);
       if (Array.isArray(forns)) DB.set('fornecedores', forns);
       
@@ -1222,9 +1231,7 @@ function executarImportacaoProdutos() {
   DB.set('produtos', currentProducts);
 
   if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
-    currentProducts.forEach(p => {
-      window.SupabaseBridge.saveProduto(p).catch(err => console.warn('Supabase sync error:', err));
-    });
+    window.SupabaseBridge.saveProdutosBatch(currentProducts).catch(err => console.warn('Supabase sync error:', err));
   }
 
   Security.logAudit('IMPORTACAO_PLANILHA', `Importação de planilha concluída. ${countAdded} adicionados, ${countUpdated} atualizados.`);
