@@ -60,19 +60,23 @@ const SupabaseBridge = {
 
   // ===== AUTENTICAÇÃO =====
   async login(email, password) {
-    if (!this.client) return null;
+    if (!this.client) this.init();
+    if (!this.client) throw new Error('Não foi possível conectar ao Supabase.');
+
     const { data, error } = await this.client.auth.signInWithPassword({ email, password });
     if (error) throw error;
 
     // Busca o perfil e empresa do usuário logado
-    const { data: perfil, error: perfilError } = await this.client
-      .from('perfis')
-      .select('*, empresas(*)')
-      .eq('id', data.user.id)
-      .single();
-
-    if (perfilError) {
-      console.warn('Perfil não encontrado para o usuário:', perfilError);
+    let perfil = null;
+    try {
+      const { data: pData } = await this.client
+        .from('perfis')
+        .select('*, empresas(*)')
+        .eq('id', data.user.id)
+        .maybeSingle();
+      perfil = pData;
+    } catch (e) {
+      console.warn('Perfil pendente:', e);
     }
 
     this.currentUser = data.user;
@@ -84,7 +88,7 @@ const SupabaseBridge = {
       nome: perfil?.nome || data.user.email.split('@')[0],
       perfil: perfil?.perfil || 'Administrador',
       empresaId: perfil?.empresa_id,
-      empresaNome: perfil?.empresas?.nome || 'Minha Empresa',
+      empresaNome: perfil?.empresas?.nome || 'EngePro Gestão de Estoque',
       avatar: perfil?.avatar || 'AD'
     };
   },

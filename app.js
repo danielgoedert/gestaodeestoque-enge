@@ -206,7 +206,16 @@ async function doLogin(event) {
       console.warn('Erro na autenticação Supabase:', sbErr);
       Security.recordFailedLogin();
       Security.logAudit('LOGIN_FALHOU', `Falha de autenticação no Supabase para ${email}: ${sbErr.message}`, 'FAILURE');
-      toast(sbErr.message === 'Invalid login credentials' ? 'E-mail ou senha incorretos no Supabase.' : (sbErr.message || 'Erro ao autenticar.'), 'error');
+      
+      let msg = 'Erro ao autenticar.';
+      if (sbErr.message === 'Invalid login credentials') {
+        msg = 'E-mail ou senha incorretos no Supabase.';
+      } else if (sbErr.message === 'Failed to fetch' || sbErr.name === 'TypeError') {
+        msg = 'Falha ao conectar com o Supabase. Se estiver no Opera GX, desative o botão [VPN] ou o bloqueador.';
+      } else if (sbErr.message) {
+        msg = sbErr.message;
+      }
+      toast(msg, 'error');
       return;
     }
   }
