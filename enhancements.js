@@ -633,6 +633,9 @@ function salvarProdutoCompleto(event, originalId) {
   if (index >= 0) allProducts[index] = saved; else allProducts.unshift(saved);
   try { DB.set('produtos', allProducts); }
   catch { return toast('Não foi possível salvar no armazenamento. Tente uma imagem menor.', 'error'); }
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    window.SupabaseBridge.saveProduto(saved).catch(err => console.warn('Supabase sync error:', err));
+  }
   Security.logAudit(originalId ? 'PRODUTO_ATUALIZADO' : 'PRODUTO_CRIADO', `Produto ${saved.id} (${saved.nome}) salvo.`);
   fecharModal();
   state.productPage = 1;
@@ -1767,6 +1770,11 @@ function movimentacaoRapidaProduto(productId, delta, event) {
 
   Security.logAudit(delta > 0 ? 'MOVIMENTACAO_ENTRADA_RAPIDA' : 'MOVIMENTACAO_SAIDA_RAPIDA', `Movimentação rápida (${delta > 0 ? '+1' : '-1'}) no produto ${product.id} - ${product.nome}. Saldo: ${newStock}.`);
 
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    window.SupabaseBridge.saveProduto(product).catch(err => console.warn('Supabase sync error:', err));
+    if (movs[0]) window.SupabaseBridge.addMovimentacao(movs[0]).catch(err => console.warn('Supabase sync error:', err));
+  }
+
   renderProducts();
   if (typeof renderHeaderBadges === 'function') renderHeaderBadges();
   toast(`${delta > 0 ? '+1' : '-1'} ${product.unidade}: ${product.nome} (Novo saldo: ${newStock})`, delta > 0 ? 'success' : 'info');
@@ -2047,6 +2055,11 @@ function confirmarImportacaoNFe() {
   DB.set('produtos', allProducts);
   DB.set('movimentacoes', movs);
 
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    allProducts.forEach(p => window.SupabaseBridge.saveProduto(p).catch(err => console.warn('Supabase product sync error:', err)));
+    movs.slice(0, addedCount + updatedCount).forEach(m => window.SupabaseBridge.addMovimentacao(m).catch(err => console.warn('Supabase mov sync error:', err)));
+  }
+
   // Cadastrar ou atualizar fornecedor
   if (shouldRegisterSupplier && nfe.emitNome) {
     const suppliers = DB.get('fornecedores') || [];
@@ -2068,6 +2081,9 @@ function confirmarImportacaoNFe() {
       });
     }
     DB.set('fornecedores', suppliers);
+    if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+      window.SupabaseBridge.saveFornecedor(suppliers[0]).catch(err => console.warn('Supabase forn sync error:', err));
+    }
   }
 
   Security.logAudit('NFE_IMPORTADA', `NF-e nº ${nfe.nNF} (${nfe.emitNome}) processada com sucesso: ${updatedCount} produtos atualizados, ${addedCount} novos produtos cadastrados. Total: ${money(nfe.totalNF)}.`);
