@@ -506,15 +506,24 @@ renderProducts = function () {
   $('produtos-tbl').querySelector('tbody').innerHTML = rows.length
     ? rows.map(product => {
         const safeId = Security.sanitizeId(product.id);
+        const maxSt = Math.max(1, Number(product.estoqueMax) || Number(product.estoqueAtual) || 1);
+        const curSt = Math.max(0, Number(product.estoqueAtual) || 0);
+        const stockPct = Math.min(100, Math.round((curSt / maxSt) * 100));
+        const stClass = slug(epStatus(product));
         return `<tr>
           <td><strong>${esc(product.id)}</strong></td>
           <td><button class="product-cell product-name-btn" onclick="abrirDetalhesProduto('${safeId}')"><img src="${productImage(product)}" alt=""><span><strong>${esc(product.nome)}</strong><small>${esc(product.desc || 'Sem descrição')}</small></span></button></td>
           <td><span class="category-pill">${esc(product.categoria)}</span></td><td>${esc(product.unidade)}</td>
           <td>
-            <div class="quick-stock-ctrl">
-              <button type="button" class="btn-quick-step btn-minus" title="Baixa rápida (-1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', -1, event)">-1</button>
-              <strong class="stock-value ${slug(epStatus(product))}">${Number(product.estoqueAtual).toLocaleString('pt-BR')}</strong>
-              <button type="button" class="btn-quick-step btn-plus" title="Entrada rápida (+1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', 1, event)">+1</button>
+            <div class="stock-cell-wrap">
+              <div class="quick-stock-ctrl">
+                <button type="button" class="btn-quick-step btn-minus" title="Baixa rápida (-1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', -1, event)">-1</button>
+                <strong class="stock-value ${stClass}">${curSt.toLocaleString('pt-BR')}</strong>
+                <button type="button" class="btn-quick-step btn-plus" title="Entrada rápida (+1 unidade)" onclick="movimentacaoRapidaProduto('${safeId}', 1, event)">+1</button>
+              </div>
+              <div class="stock-level-track" title="Nível de estoque: ${stockPct}% do limite máximo">
+                <div class="stock-level-fill ${stClass}" style="width: ${stockPct}%;"></div>
+              </div>
             </div>
           </td>
           <td>${Number(product.estoqueMin).toLocaleString('pt-BR')}</td><td>${Number(product.estoqueMax).toLocaleString('pt-BR')}</td>
