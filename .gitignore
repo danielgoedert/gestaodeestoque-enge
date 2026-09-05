@@ -4,6 +4,9 @@
 test-out.txt
 test-dom.txt
 test-security.html
+.playwright-cli/
+tmp/
+output/playwright/
 
 # OS Files
 Thumbs.db

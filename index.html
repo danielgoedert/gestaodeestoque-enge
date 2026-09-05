@@ -10,7 +10,7 @@
 <title>EngePro | Gestão de Estoque</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260905-motion4">
 </head>
 <body>
 
@@ -446,6 +446,13 @@
             </div>
           </div>
 
+          <div class="report-print-meta" aria-hidden="true">
+            <div><span>Emitido em</span><strong id="report-print-date">—</strong></div>
+            <div><span>Período</span><strong id="report-print-period">Todo o histórico</strong></div>
+            <div><span>Responsável</span><strong id="report-print-owner">Sistema EngePro</strong></div>
+            <div><span>Leitura</span><strong>Visão executiva</strong></div>
+          </div>
+
           <!-- KPIs DINÂMICOS DO RELATÓRIO -->
           <div class="kpi-row" id="report-kpis" style="margin-bottom: 20px;"></div>
 
@@ -462,6 +469,13 @@
 
           <!-- TABELA COMPLETA DO RELATÓRIO -->
           <div class="report-table-section">
+            <div class="report-print-detail-heading">
+              <div>
+                <span>Detalhamento operacional</span>
+                <strong>Base completa do relatório</strong>
+              </div>
+              <small>Continuação da visão executiva</small>
+            </div>
             <div class="table-wrap">
               <table class="tbl" id="report-main-table">
                 <thead id="report-table-thead"></thead>
@@ -616,6 +630,6 @@
 <script src="supabaseClient.js"></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
-<script src="enhancements.js"></script>
+<script src="enhancements.js?v=20260905-motion4"></script>
 </body>
 </html>

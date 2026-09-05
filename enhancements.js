@@ -1711,6 +1711,13 @@ function exportarRelatorioAtual() {
 
 function imprimirRelatorioAtual() {
   const report = reportTypes[selectedReportType];
+  const printDate = $('report-print-date');
+  const printPeriod = $('report-print-period');
+  const printOwner = $('report-print-owner');
+  const periodSelect = $('report-period-select');
+  if (printDate) printDate.textContent = new Date().toLocaleString('pt-BR');
+  if (printPeriod) printPeriod.textContent = periodSelect?.selectedOptions?.[0]?.textContent || 'Todo o histórico';
+  if (printOwner) printOwner.textContent = state.user?.nome || 'Sistema EngePro';
   Security.logAudit('RELATORIO_IMPRESSO', `Impressão do relatório: ${report?.name || selectedReportType}`);
   window.print();
 }
@@ -2339,10 +2346,99 @@ kpi = function (target, items) {
 };
 
 const renderPageBeforeIconRefresh = renderPage;
+let pageMotionRunId = 0;
+let pageMotionEntries = [];
+
+function cancelPageMotion() {
+  pageMotionRunId += 1;
+  pageMotionEntries.forEach(({ element, handler }) => {
+    element.removeEventListener('animationend', handler);
+    element.classList.remove('motion-content-enter');
+    element.style.removeProperty('--motion-delay');
+  });
+  pageMotionEntries = [];
+}
+
 renderPage = function (page) {
+  cancelPageMotion();
+  const runId = pageMotionRunId;
   renderPageBeforeIconRefresh(page);
-  requestAnimationFrame(refreshInterfaceIcons);
+  refreshInterfaceIcons();
+  initializePageMotion(page, runId);
 };
 
-document.addEventListener('DOMContentLoaded', () => requestAnimationFrame(refreshInterfaceIcons));
+const pageMotionTargets = [
+  ':scope > .pg-header',
+  ':scope > .kpi-row > .kpi-card',
+  ':scope > #dash-resumo-operacional > *',
+  ':scope > .performance-dashboard-card',
+  ':scope > .dashboard-analytics-grid > .card',
+  ':scope > .stock-overview-grid > .card',
+  ':scope > .stock-top-card',
+  ':scope > .report-selector-card',
+  ':scope > .report-viewer-card > .report-toolbar',
+  ':scope > .report-viewer-card > .kpi-row > .kpi-card',
+  ':scope > .report-viewer-card > .report-chart-container',
+  ':scope > .report-viewer-card > .report-table-section',
+  ':scope > .report-recent-card',
+  ':scope > .config-grid > .card',
+  ':scope > .card:not(.performance-dashboard-card):not(.stock-top-card):not(.report-selector-card):not(.report-viewer-card):not(.report-recent-card)'
+].join(',');
+
+function settleMotion(animation) {
+  if (!animation) return;
+  animation.finished.then(() => animation.cancel()).catch(() => {});
+}
+
+function initializePageMotion(page, runId = pageMotionRunId) {
+  const activePage = $(`pg-${page || state.page}`) || document.querySelector('.pg.active');
+  if (!activePage || runId !== pageMotionRunId) return;
+
+  const targets = [...activePage.querySelectorAll(pageMotionTargets)];
+  targets.forEach((element, index) => {
+    const handler = event => {
+      if (event.target !== element || event.animationName !== 'contentTabEnter') return;
+      element.removeEventListener('animationend', handler);
+      element.classList.remove('motion-content-enter');
+      element.style.removeProperty('--motion-delay');
+      pageMotionEntries = pageMotionEntries.filter(entry => entry.element !== element);
+    };
+
+    element.style.setProperty('--motion-delay', `${index * 70}ms`);
+    element.classList.add('motion-content-enter');
+    element.addEventListener('animationend', handler);
+    pageMotionEntries.push({ element, handler });
+  });
+}
+
+function animateReportRefresh() {
+  const targets = document.querySelectorAll('#report-kpis, #report-chart-container, #pg-relatorios .report-table-section');
+  targets.forEach((element, index) => {
+    element.classList.remove('motion-content-refresh');
+    void element.offsetWidth;
+    element.classList.add('motion-content-refresh');
+    if (typeof element.animate === 'function') {
+      settleMotion(element.animate([
+        { opacity: .12, filter: 'blur(10px)', transform: 'translate3d(24px, 0, 0) scale(.975)' },
+        { opacity: 1, filter: 'blur(0)', transform: 'translate3d(0, 0, 0) scale(1)' }
+      ], {
+        duration: 650,
+        delay: index * 110,
+        easing: 'cubic-bezier(.16, 1, .3, 1)',
+        fill: 'both'
+      }));
+    }
+  });
+}
+
+const selecionarRelatorioBeforeMotion = selecionarRelatorio;
+selecionarRelatorio = function (key, element) {
+  selecionarRelatorioBeforeMotion(key, element);
+  requestAnimationFrame(animateReportRefresh);
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  refreshInterfaceIcons();
+  initializePageMotion(state.page);
+});
 

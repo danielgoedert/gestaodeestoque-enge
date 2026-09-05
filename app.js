@@ -73,6 +73,8 @@ function updateIpDisplay() {
 
 const $ = id => document.getElementById(id);
 const esc = str => Security.esc(str);
+const LOCAL_DEMO_ENABLED = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  && new URLSearchParams(window.location.search).get('demo') === '1';
 function slug(str) {
   return String(str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
@@ -116,7 +118,7 @@ function refreshIcons() {
 }
 
 // Inicialização
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   DB.init();
   detectClientIp();
 
@@ -128,7 +130,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // 2. Verifica sessão persistida (localStorage para 'lembrar', sessionStorage para sessão única)
-  const saved = localStorage.getItem('ep_user') || sessionStorage.getItem('ep_user');
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    const restoredSession = await window.SupabaseBridge.restoreSession();
+    if (restoredSession) {
+      restoredSession.loginTime = Date.now();
+      loginSuccess(restoredSession);
+      return;
+    }
+  }
+
+  // O modo local só pode ser ativado explicitamente em localhost/?demo=1.
+  const saved = LOCAL_DEMO_ENABLED && (localStorage.getItem('ep_user') || sessionStorage.getItem('ep_user'));
   if (saved) {
     try {
       const u = JSON.parse(saved);
@@ -151,9 +163,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  localStorage.removeItem('ep_user');
+  sessionStorage.removeItem('ep_user');
   $('page-login').classList.add('active');
   $('app').classList.add('hidden');
   refreshIcons();
+  if (window.SupabaseBridge?.getRecoveryToken()) abrirRedefinicaoSenhaSupabase();
 });
 
 // Autenticação com SHA-256 + Salt + Proteção Anti-Força Bruta, Anti-SQL Injection e Lembrar Dispositivo
@@ -190,6 +205,7 @@ async function doLogin(event) {
         userSession.loginTime = Date.now();
         Security.resetRateLimit();
         const rememberChecked = $('remember')?.checked;
+        window.SupabaseBridge.persistSession(!!rememberChecked);
         if (rememberChecked) {
           localStorage.setItem('ep_user', JSON.stringify(userSession));
           localStorage.setItem('ep_remembered_email', email);
@@ -222,6 +238,10 @@ async function doLogin(event) {
   }
 
   // 4. Autenticação Local / Fallback
+  if (!LOCAL_DEMO_ENABLED) {
+    toast('Autenticação indisponível. Verifique a conexão com o serviço de acesso.', 'error');
+    return;
+  }
   const u = DB.getUser(email);
 
   if (!u || !u.ativo) {
@@ -404,12 +424,27 @@ function abrirModalEsqueciSenha() {
 function solicitarRecuperacaoSenha(e) {
   e.preventDefault();
   const rawEmail = $('rec-email')?.value || '';
+  const email = Security.sanitizeText(rawEmail, 100).toLowerCase().trim();
+
+  if (window.SupabaseBridge && window.SupabaseBridge.isConfigured()) {
+    window.SupabaseBridge.requestPasswordReset(email)
+      .then(() => {
+        fecharModal();
+        toast('Se o e-mail estiver cadastrado, você receberá as instruções para redefinir a senha.', 'success');
+      })
+      .catch(() => toast('Não foi possível iniciar a recuperação. Tente novamente mais tarde.', 'error'));
+    return;
+  }
+
+  if (!LOCAL_DEMO_ENABLED) {
+    toast('A recuperação de senha está disponível somente pelo serviço de acesso.', 'error');
+    return;
+  }
   if (Security.detectSqlInjection(rawEmail)) {
     Security.logAudit('SQL_INJECTION_DETECTADA', `Tentativa de SQL Injection na recuperação de senha: ${rawEmail}`, 'CRITICAL');
     return toast('E-mail com caracteres inválidos.', 'error');
   }
 
-  const email = Security.sanitizeText(rawEmail, 100).toLowerCase().trim();
   const u = DB.getUser(email);
 
   if (!u || !u.ativo) {
@@ -492,6 +527,42 @@ async function confirmarNovaSenha(e) {
     toast('Senha redefinida com sucesso! Você já pode entrar.', 'success');
   } else {
     toast('Erro ao atualizar usuário.', 'error');
+  }
+}
+
+function abrirRedefinicaoSenhaSupabase() {
+  modal('Definir nova senha', `
+    <form onsubmit="confirmarRedefinicaoSenhaSupabase(event)">
+      <p style="margin-bottom: 16px; font-size: 13px; color: var(--text2); line-height: 1.5;">
+        Defina uma nova senha para sua conta.
+      </p>
+      <div class="form-group">
+        <label>Nova senha *</label>
+        <input type="password" id="cloud-rec-new-pass" required minlength="12" maxlength="100" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Confirmar nova senha *</label>
+        <input type="password" id="cloud-rec-confirm-pass" required minlength="12" maxlength="100" autocomplete="new-password">
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn-primary">Atualizar senha</button>
+      </div>
+    </form>
+  `);
+}
+
+async function confirmarRedefinicaoSenhaSupabase(e) {
+  e.preventDefault();
+  const newPass = $('cloud-rec-new-pass')?.value || '';
+  const confirmPass = $('cloud-rec-confirm-pass')?.value || '';
+  if (newPass.length < 12) return toast('Use uma senha com pelo menos 12 caracteres.', 'error');
+  if (newPass !== confirmPass) return toast('As senhas digitadas não coincidem.', 'error');
+  try {
+    await window.SupabaseBridge.updatePasswordFromRecovery(newPass);
+    fecharModal();
+    toast('Senha atualizada. Você já pode entrar.', 'success');
+  } catch (error) {
+    toast(error.message || 'Não foi possível atualizar a senha.', 'error');
   }
 }
 

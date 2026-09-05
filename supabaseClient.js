@@ -31,14 +31,69 @@ const SupabaseBridge = {
   },
 
   init() {
-    const savedToken = localStorage.getItem('ep_sb_token') || sessionStorage.getItem('ep_sb_token');
-    if (savedToken) this.token = savedToken;
-    const savedPerfil = localStorage.getItem('ep_sb_perfil') || sessionStorage.getItem('ep_sb_perfil');
-    if (savedPerfil) {
-      try { this.currentPerfil = JSON.parse(savedPerfil); } catch {}
-    }
-    console.log('✅ Supabase Bridge nativo inicializado!');
+    // A sessão só é restaurada após restoreSession() validá-la no Supabase.
+    console.log('Supabase Bridge inicializado.');
     return this;
+  },
+
+  clearStoredSession() {
+    this.token = null;
+    this.currentUser = null;
+    this.currentPerfil = null;
+    ['ep_sb_token', 'ep_sb_perfil', 'ep_user'].forEach(key => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  },
+
+  persistSession(remember = false) {
+    const primary = remember ? localStorage : sessionStorage;
+    const secondary = remember ? sessionStorage : localStorage;
+    secondary.removeItem('ep_sb_token');
+    secondary.removeItem('ep_sb_perfil');
+    if (this.token) primary.setItem('ep_sb_token', this.token);
+    if (this.currentPerfil) primary.setItem('ep_sb_perfil', JSON.stringify(this.currentPerfil));
+  },
+
+  async restoreSession() {
+    if (!this.isConfigured()) return null;
+    const token = localStorage.getItem('ep_sb_token') || sessionStorage.getItem('ep_sb_token');
+    if (!token) return null;
+
+    try {
+      const userRes = await fetch(`${SUPABASE_CONFIG.url}/auth/v1/user`, {
+        headers: { apikey: SUPABASE_CONFIG.anonKey, Authorization: `Bearer ${token}` }
+      });
+      if (!userRes.ok) throw new Error('Sessão inválida ou expirada.');
+      const user = await userRes.json();
+      this.token = token;
+      this.currentUser = user;
+      const profileRes = await fetch(`${SUPABASE_CONFIG.url}/rest/v1/perfis?select=*,empresas(*)&id=eq.${encodeURIComponent(user.id)}`, {
+        headers: this.getHeaders(true)
+      });
+      if (!profileRes.ok) throw new Error('Perfil não encontrado.');
+      const profile = (await profileRes.json())[0];
+      if (!profile || profile.ativo === false || !['Administrador', 'Operador'].includes(profile.perfil)) {
+        throw new Error('Perfil sem autorização.');
+      }
+      this.currentPerfil = profile;
+      return this.buildAppSession(user, profile);
+    } catch {
+      this.clearStoredSession();
+      return null;
+    }
+  },
+
+  buildAppSession(user, perfil) {
+    return {
+      id: user.id,
+      email: user.email,
+      nome: perfil.nome || user.email.split('@')[0],
+      perfil: perfil.perfil,
+      empresaId: perfil.empresa_id,
+      empresaNome: perfil.empresas?.nome || 'Gestão de Estoque',
+      avatar: perfil.avatar || 'US'
+    };
   },
 
   getEmpresaId() {
@@ -72,8 +127,6 @@ const SupabaseBridge = {
     }
 
     this.token = data.access_token;
-    localStorage.setItem('ep_sb_token', data.access_token);
-    sessionStorage.setItem('ep_sb_token', data.access_token);
     this.currentUser = data.user;
 
     // Busca o perfil da empresa
@@ -90,34 +143,48 @@ const SupabaseBridge = {
       console.warn('Perfil query warning:', err);
     }
 
-    this.currentPerfil = perfil;
-    if (perfil) {
-      localStorage.setItem('ep_sb_perfil', JSON.stringify(perfil));
-      sessionStorage.setItem('ep_sb_perfil', JSON.stringify(perfil));
+    if (!perfil || perfil.ativo === false || !['Administrador', 'Operador'].includes(perfil.perfil)) {
+      this.clearStoredSession();
+      throw new Error('Seu usuário não possui um perfil ativo autorizado.');
     }
-
-    const resolvedEmpresaId = perfil?.empresa_id || '11111111-1111-1111-1111-111111111111';
-    const resolvedEmpresaNome = perfil?.empresas?.nome || (perfil?.nome ? `${perfil.nome} - Estoque` : 'EngePro Gestão de Estoque');
-
-    return {
-      id: data.user.id,
-      email: data.user.email,
-      nome: perfil?.nome || data.user.email.split('@')[0],
-      perfil: perfil?.perfil || 'Administrador',
-      empresaId: resolvedEmpresaId,
-      empresaNome: resolvedEmpresaNome,
-      avatar: perfil?.avatar || 'AD'
-    };
+    this.currentPerfil = perfil;
+    return this.buildAppSession(data.user, perfil);
   },
 
   async logout() {
-    this.token = null;
-    this.currentUser = null;
-    this.currentPerfil = null;
-    localStorage.removeItem('ep_sb_token');
-    sessionStorage.removeItem('ep_sb_token');
-    localStorage.removeItem('ep_sb_perfil');
-    sessionStorage.removeItem('ep_sb_perfil');
+    this.clearStoredSession();
+  },
+
+  async requestPasswordReset(email) {
+    const res = await fetch(`${SUPABASE_CONFIG.url}/auth/v1/recover`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_CONFIG.anonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, redirect_to: `${window.location.origin}/` })
+    });
+    if (!res.ok) throw new Error('Não foi possível iniciar a recuperação de senha.');
+    return true;
+  },
+
+  getRecoveryToken() {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    return params.get('type') === 'recovery' ? params.get('access_token') : null;
+  },
+
+  async updatePasswordFromRecovery(newPassword) {
+    const token = this.getRecoveryToken();
+    if (!token) throw new Error('Link de recuperação inválido ou expirado.');
+    const res = await fetch(`${SUPABASE_CONFIG.url}/auth/v1/user`, {
+      method: 'PUT',
+      headers: {
+        apikey: SUPABASE_CONFIG.anonKey,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ password: newPassword })
+    });
+    if (!res.ok) throw new Error('Não foi possível atualizar a senha. Solicite um novo link.');
+    window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
+    return true;
   },
 
   // ===== PRODUTOS =====

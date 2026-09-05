@@ -22,14 +22,14 @@ BEGIN
     v_empresa_id,
     v_nome,
     NEW.email,
-    'Administrador',
+    'Operador',
     UPPER(SUBSTRING(SPLIT_PART(NEW.email, '.', 1), 1, 1) || COALESCE(SUBSTRING(SPLIT_PART(SPLIT_PART(NEW.email, '@', 1), '.', 2), 1, 1), ''))
   )
   ON CONFLICT (id) DO UPDATE
   SET empresa_id = EXCLUDED.empresa_id,
       nome = EXCLUDED.nome,
       email = EXCLUDED.email,
-      perfil = 'Administrador';
+      perfil = 'Operador';
 
   RETURN NEW;
 END;
@@ -68,13 +68,13 @@ BEGIN
       v_empresa_id,
       v_nome,
       u.email,
-      'Administrador',
+      CASE WHEN u.email = 'daniel.fernandes@engeproconsultoria.com.br' THEN 'Administrador' ELSE 'Operador' END,
       UPPER(SUBSTRING(SPLIT_PART(u.email, '.', 1), 1, 1) || COALESCE(SUBSTRING(SPLIT_PART(SPLIT_PART(u.email, '@', 1), '.', 2), 1, 1), ''))
     )
     ON CONFLICT (id) DO UPDATE 
     SET empresa_id = EXCLUDED.empresa_id,
         nome = EXCLUDED.nome,
         email = EXCLUDED.email,
-        perfil = 'Administrador';
+        perfil = CASE WHEN u.email = 'daniel.fernandes@engeproconsultoria.com.br' THEN 'Administrador' ELSE 'Operador' END;
   END LOOP;
 END $$;

@@ -335,15 +335,8 @@ const DB = {
     // 1. Inicialização segura de Usuários com Salt e Hash SHA-256
     let usuarios = this.get('usuarios');
     if (!usuarios || usuarios.length === 0) {
-      const saltAdmin = Security.generateSalt(16);
-      const hashAdmin = Security.sha256Sync(saltAdmin + ':123456');
-      const saltJoao = Security.generateSalt(16);
-      const hashJoao = Security.sha256Sync(saltJoao + ':123456');
-
-      usuarios = [
-        { id: 1, nome: 'Administrador', email: 'admin@engepro.com', salt: saltAdmin, passwordHash: hashAdmin, perfil: 'Administrador', ativo: true, avatar: 'AD' },
-        { id: 2, nome: 'João da Silva', email: 'joao@engepro.com', salt: saltJoao, passwordHash: hashJoao, perfil: 'Operador', ativo: true, avatar: 'JS' }
-      ];
+      // Contas de demonstração previsíveis nunca devem acompanhar uma publicação.
+      usuarios = [];
       this.set('usuarios', usuarios);
     } else {
       let updated = false;
